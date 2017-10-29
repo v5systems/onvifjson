@@ -1817,6 +1817,8 @@ void onTimer(){
             it->second->idleTime++;
             if(it->second->idleTime > maxIdleTime){
                 close(it->second->srvSocket);
+                if(verbosity>1)std::cout << "Connection " << it->second->srvSocket << " is timed out" << std::endl;
+                if(it->second->data) delete[] it->second->data;
                 delete it->second;
                 it->second = NULL;
             }
@@ -1970,6 +1972,7 @@ int onDataReceived(int fd, unsigned char* data, uint32_t dataLen){
     tmpClient->data=new unsigned char [tmpClient->totalSize+1];
     tmpClient->data[tmpClient->totalSize]=0;
   }
+  tmpClient->idleTime=0;
   if(tmpClient->totalSize < (tmpClient->currentSize + dataLen)){
     recSize= (tmpClient->currentSize + dataLen) - tmpClient->totalSize;
     recMessage=data + (dataLen-recSize);
@@ -2026,6 +2029,7 @@ int onConnectionClosed(int fd){
 int deleteConnection(tClient* tmpClient){
   clientConnections[tmpClient->srvSocket]=NULL;
   close(tmpClient->srvSocket);
+  if(verbosity>1)std::cout << "Connection " << tmpClient->srvSocket << " is closed" << std::endl;
   if(tmpClient->data) delete[] tmpClient->data;
   delete tmpClient;
   return 0;
