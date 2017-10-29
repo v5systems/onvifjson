@@ -138,7 +138,6 @@ void processReceivedData(int fd, std::string message, uint32_t messageID);
 int sendData(int fd, unsigned char *message, int mSize);
 void processRcvData(int fd);
 std::string getTimeStamp();
-const char * getLogTimestamp();
 void onTimer();
 void checkTime();
 tClient* findConnection(int fd);
@@ -1810,11 +1809,6 @@ std::string getTimeStamp(){
     return std::string(the_date);
 }
 
-const char * getLogTimestamp(){
-    std::string rslt=getTimeStamp();
-    return rslt.c_str();
-}
-
 void onTimer(){
   if(maxIdleTime){
     for(std::map<int, tClient*>::iterator it = clientConnections.begin(); it != clientConnections.end();){
@@ -1823,8 +1817,8 @@ void onTimer(){
             it->second->idleTime++;
             if(it->second->idleTime > maxIdleTime){
                 close(it->second->srvSocket);
-                clientConnections[it->second->srvSocket]=NULL;
                 delete it->second;
+                it->second = NULL;
             }
             ++it;
         }
