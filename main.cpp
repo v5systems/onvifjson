@@ -62,7 +62,7 @@
 #include "include/soapImagingBindingProxy.h"
 #include "include/soapPTZBindingProxy.h"
 
-#include "../Common/include/rapidjson/document.h"
+#include "include/rapidjson/document.h"
 
 #include "plugin/wsseapi.h"
 #include "plugin/httpda.h"
