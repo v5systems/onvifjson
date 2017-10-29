@@ -29,14 +29,6 @@ typedef tHeader* pHeader;
 const size_t sHeader = 12;
 
 
-/*
- * error - wrapper for perror
- */
-void error(char *msg) {
-    perror(msg);
-    exit(0);
-}
-
 int main(int argc, char **argv) {
     int sockfd, portno, n;
     struct sockaddr_in serveraddr;
