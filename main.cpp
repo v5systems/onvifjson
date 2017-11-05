@@ -82,6 +82,8 @@
 #define CMD_PARAMS              "parameters"
 #define STATUS                  "status"
 
+#define RETRIES                 5
+
 
 using namespace std;
 using namespace rapidjson;
@@ -129,8 +131,6 @@ struct soap * glSoap;
 std::string cachedImagingOptionsResponse;
 std::string cachedMoveOptionsResponse;
 std::string cachedOSDOptionsResponse;
-
-char szVideoSourceToken[32] = {0};
 
 //Helper functions:
 int onDataReceived(int fd, unsigned char* data, uint32_t dataLen);
@@ -180,6 +180,10 @@ bool sendGetOSD(MediaBindingProxy* tProxyMedia, _trt__GetOSD * imagingSettings,
                     _trt__GetOSDResponse * imagingSettingsResponse);
 bool sendSetOSD(MediaBindingProxy* tProxyMedia, _trt__SetOSD * imagingSettings,
                     _trt__SetOSDResponse * imagingSettingsResponse);
+bool sendCreateOSD(MediaBindingProxy* tProxyMedia, _trt__CreateOSD * imagingSettings,
+                    _trt__CreateOSDResponse * imagingSettingsResponse);
+bool sendDeleteOSD(MediaBindingProxy* tProxyMedia, _trt__DeleteOSD * imagingSettings,
+                    _trt__DeleteOSDResponse * imagingSettingsResponse);
 
 //Commands functions
 void execGetImagingSettings(int fd, rapidjson::Document &d1, uint32_t messageID);
@@ -192,6 +196,8 @@ void execSystemReboot(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execGetOSDs(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execGetOSD(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execSetOSD(int fd, rapidjson::Document &d1, uint32_t messageID);
+void execCreateOSD(int fd, rapidjson::Document &d1, uint32_t messageID);
+void execDeleteOSD(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execGetOSDOptions(int fd, rapidjson::Document &d1, uint32_t messageID);
 
 std::string prepareOptionsResponse(_timg__GetOptionsResponse* optionsResponse);
@@ -210,7 +216,7 @@ bool sendGetWsdlUrl(DeviceBindingProxy* tProxyDevice, _tds__GetWsdlUrl * wsdURL,
                     _tds__GetWsdlUrlResponse * wsdURLResponse) {
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -235,7 +241,7 @@ bool sendSystemReboot(DeviceBindingProxy* tProxyDevice, _tds__SystemReboot * sys
                          _tds__SystemRebootResponse * sysRebootResponse){
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -260,7 +266,7 @@ bool sendGetCapabilities(DeviceBindingProxy* tProxyDevice, _tds__GetCapabilities
                              ImagingBindingProxy* tProxyImaging, PTZBindingProxy* tProxyPTZ) {
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -279,14 +285,14 @@ bool sendGetCapabilities(DeviceBindingProxy* tProxyDevice, _tds__GetCapabilities
       if(verbosity>2)fprintf(stderr, "ImagingUrl Found: %s\n",getCapResponse->Capabilities->Imaging->XAddr.c_str());
     } else {
       if(verbosity>1)std::cout <<  "sendGetCapabilities Imaging not found: "  << std::endl;
-      tCount = 0;
-      return false;
+      tProxyImaging->soap_endpoint = "NOTAVAILABLE";
     }
     if (getCapResponse->Capabilities->PTZ != NULL) {
       tProxyPTZ->soap_endpoint = getCapResponse->Capabilities->PTZ->XAddr.c_str();
       if(verbosity>2)fprintf(stderr, "PTZUrl Found: %s\n",getCapResponse->Capabilities->PTZ->XAddr.c_str());
     } else {
       if(verbosity>1)std::cout <<  "sendGetCapabilities PTZ not found: "  << std::endl;
+      tProxyPTZ->soap_endpoint = "NOTAVAILABLE";
     }
     tCount = 0;
     return true;
@@ -303,7 +309,7 @@ bool sendGetImagingSettings(ImagingBindingProxy* tProxyImaging, _timg__GetImagin
                     _timg__GetImagingSettingsResponse * imagingSettingsResponse) {
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -328,7 +334,7 @@ bool sendGetVideoSources(MediaBindingProxy* tProxyMedia, _trt__GetVideoSources *
                     _trt__GetVideoSourcesResponse * imagingSettingsResponse){
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -360,7 +366,7 @@ bool sendSetImagingSettings(ImagingBindingProxy* tProxyImaging, _timg__SetImagin
                     _timg__SetImagingSettingsResponse * imagingSettingsResponse) {
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -385,7 +391,7 @@ bool sendGetOptions(ImagingBindingProxy* tProxyImaging, _timg__GetOptions * imag
                     _timg__GetOptionsResponse * imagingSettingsResponse) {
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -410,7 +416,7 @@ bool sendGetOSDs(MediaBindingProxy* tProxyMedia, _trt__GetOSDs * imagingSettings
                     _trt__GetOSDsResponse * imagingSettingsResponse){
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -436,7 +442,7 @@ bool sendGetOSD(MediaBindingProxy* tProxyMedia, _trt__GetOSD * imagingSettings,
                     _trt__GetOSDResponse * imagingSettingsResponse){
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -457,11 +463,62 @@ bool sendGetOSD(MediaBindingProxy* tProxyMedia, _trt__GetOSD * imagingSettings,
   }
 }
 
+bool sendCreateOSD(MediaBindingProxy* tProxyMedia, _trt__CreateOSD * imagingSettings,
+                    _trt__CreateOSDResponse * imagingSettingsResponse){
+  static int tCount=0;
+  tCount++;
+  if(tCount > RETRIES){
+    tCount = 0;
+    return false;
+  }
+
+  int result = tProxyMedia->CreateOSD(imagingSettings, *imagingSettingsResponse);
+  if (result == SOAP_OK) {
+    if(verbosity>2) {
+      fprintf(stderr, "CreateOSD Found: \n");
+    }
+    tCount = 0;
+    return true;
+  } else {
+    if(verbosity>2)std::cout <<  "sendCreateOSD return result: " << result << std::endl;
+    if(verbosity>1)printError(tProxyMedia->soap);
+    tProxyMedia->soap->userid = onvifLogin.c_str();
+    tProxyMedia->soap->passwd = onvifPass.c_str();
+    return sendCreateOSD(tProxyMedia, imagingSettings, imagingSettingsResponse);
+  }
+}
+
+bool sendDeleteOSD(MediaBindingProxy* tProxyMedia, _trt__DeleteOSD * imagingSettings,
+                    _trt__DeleteOSDResponse * imagingSettingsResponse){
+  static int tCount=0;
+  tCount++;
+  if(tCount > RETRIES){
+    tCount = 0;
+    return false;
+  }
+
+  int result = tProxyMedia->DeleteOSD(imagingSettings, *imagingSettingsResponse);
+  if (result == SOAP_OK) {
+    if(verbosity>2) {
+      fprintf(stderr, "DeleteOSD Found: \n");
+    }
+    tCount = 0;
+    return true;
+  } else {
+    if(verbosity>2)std::cout <<  "sendDeleteOSD return result: " << result << std::endl;
+    if(verbosity>1)printError(tProxyMedia->soap);
+    tProxyMedia->soap->userid = onvifLogin.c_str();
+    tProxyMedia->soap->passwd = onvifPass.c_str();
+    return sendDeleteOSD(tProxyMedia, imagingSettings, imagingSettingsResponse);
+  }
+}
+
+
 bool sendSetOSD(MediaBindingProxy* tProxyMedia, _trt__SetOSD * imagingSettings,
                     _trt__SetOSDResponse * imagingSettingsResponse){
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -488,7 +545,7 @@ bool sendGetOSDOptions(MediaBindingProxy* tProxyMedia, _trt__GetOSDOptions * ima
                     _trt__GetOSDOptionsResponse * imagingSettingsResponse){
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -514,7 +571,7 @@ bool sendGetMoveOptions(ImagingBindingProxy* tProxyImaging, _timg__GetMoveOption
                     _timg__GetMoveOptionsResponse * imagingSettingsResponse) {
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -539,7 +596,7 @@ bool sendStop(ImagingBindingProxy* tProxyImaging, _timg__Stop * imagingSettings,
                     _timg__StopResponse * imagingSettingsResponse) {
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -564,7 +621,7 @@ bool sendMove(ImagingBindingProxy* tProxyImaging, _timg__Move * imagingSettings,
                     _timg__MoveResponse * imagingSettingsResponse) {
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -589,7 +646,7 @@ bool sendGetProfiles(MediaBindingProxy* tProxyMedia, _trt__GetProfiles * getProf
                      _trt__GetProfilesResponse * getProfilesResponse, soap * tSoap) {
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -610,7 +667,8 @@ bool sendGetProfiles(MediaBindingProxy* tProxyMedia, _trt__GetProfiles * getProf
       if(verbosity>2)fprintf(stderr, "\t%d Name:%s\n\t\tToken:%s\n", i, getProfilesResponse->Profiles[i]->Name.c_str(),
                                getProfilesResponse->Profiles[i]->token.c_str());
       tmpGetStreamUri->ProfileToken = getProfilesResponse->Profiles[i]->token;
-      if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(tProxyMedia->soap, NULL, onvifLogin.c_str(),  onvifPass.c_str())) {
+      if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(tProxyMedia->soap, NULL, onvifLogin.c_str(),
+                                                        onvifPass.c_str())) {
         tCount = 0;
         return false;
       }
@@ -635,7 +693,7 @@ bool sendGetStreamUri(MediaBindingProxy* tProxyMedia, _trt__GetStreamUri * strea
                       _trt__GetStreamUriResponse * streamUriResponse) {
   static int tCount=0;
   tCount++;
-  if(tCount > 4){
+  if(tCount > RETRIES){
     tCount = 0;
     return false;
   }
@@ -952,7 +1010,8 @@ void execSetImagingSettings(int fd, rapidjson::Document &d1, uint32_t messageID)
       goto cleanSendResponse;
     }
 
-    SetImagingSettings = soap_new__timg__SetImagingSettings(glSoap, -1);
+    //SetImagingSettings = soap_new__timg__SetImagingSettings(glSoap, -1);
+    SetImagingSettings = soap_new__timg__SetImagingSettings(glSoap);
     SetImagingSettingsResponse = soap_new__timg__SetImagingSettingsResponse(glSoap, -1);
     SetImagingSettings->ImagingSettings=GetImagingSettingsResponse->ImagingSettings;
     SetImagingSettings->VideoSourceToken=videoSources[0];
@@ -1159,58 +1218,521 @@ sendResponse:
 }
 
 void execGetOSDs(int fd, rapidjson::Document &d1, uint32_t messageID){
-  std::string outStr="{\"status\":\"ERROR\", \"reason\":\"Not implemented yet\"}";
-  goto cleanSendResponse;
-/*
-bool sendStop(ImagingBindingProxy* tProxyImaging, _timg__Stop * imagingSettings,
-                    _timg__StopResponse * imagingSettingsResponse);
-*/
+    std::string outStr;
+    /*
+    bool sendGetOSDs(MediaBindingProxy* tProxyMedia, _trt__GetOSDs * imagingSettings,
+                    _trt__GetOSDsResponse * imagingSettingsResponse);
+    */
+    _trt__GetOSDs * GetOSDs;
+    _trt__GetOSDsResponse * GetOSDsResponse;
 
+    if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyMedia.soap, NULL, onvifLogin.c_str(), onvifPass.c_str())) {
+      std::cout << "Failed to assign user:password" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to assign user:password\"}";
+      goto sendResponse;
+    }
+
+    if (SOAP_OK != soap_wsse_add_Timestamp(proxyMedia.soap, "Time", 10)) {
+      std::cout << "Failed to set a timestamp" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to set a timestamp\"}";
+      goto sendResponse;
+    }
+
+    proxyMedia.soap->recv_timeout=ONVIF_WAIT_TIMEOUT;
+    proxyMedia.soap->send_timeout=ONVIF_WAIT_TIMEOUT;
+    proxyMedia.soap->connect_timeout=ONVIF_WAIT_TIMEOUT;
+
+
+    GetOSDs = soap_new__trt__GetOSDs(glSoap, -1);
+    GetOSDsResponse = soap_new__trt__GetOSDsResponse(glSoap, -1);
+
+    if(false == sendGetOSDs(&proxyMedia, GetOSDs, GetOSDsResponse)) {
+      if(verbosity>2)std::cout <<  "sendGetOSDs failed all attempts" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetOSDs failed all attempts\"}";
+      goto cleanSendResponse;
+    }
+//Process response
+    outStr="{\"status\":\"OK\", \"parameters\":{";
+    if(verbosity>3) std::cout << "Number of OSDs received is " << GetOSDsResponse->OSDs.size() << std::endl;
+    if(GetOSDsResponse->OSDs.size()>0){
+      outStr+="\"OSDs\":[";
+      for (unsigned i=0; i<GetOSDsResponse->OSDs.size(); i++){
+        if(i>0)outStr+=", ";
+        outStr+="{";
+        tt__OSDConfiguration* tmpOSD=GetOSDsResponse->OSDs[i];
+        if(tmpOSD->Position!=NULL){
+          outStr+="\"Position\":{";
+          if(tmpOSD->Position->Pos !=NULL){
+            outStr+="\"Pos\":{";
+            outStr+="\"x\":\""+std::to_string(*tmpOSD->Position->Pos->x)+"\", ";
+            outStr+="\"y\":\""+std::to_string(*tmpOSD->Position->Pos->y)+"\"";
+            outStr+="}, ";
+          }
+          outStr+="\"Type\":\""+tmpOSD->Position->Type+"\"";
+          if(outStr.at(outStr.length()-1)==' ') outStr.erase (outStr.length()-2, 2);
+          outStr+="}, ";
+        }
+        if(tmpOSD->TextString!=NULL){
+          outStr+="\"TextString\":{";
+          if(tmpOSD->TextString->DateFormat!=NULL){
+            outStr+="\"DateFormat\":\""+(*tmpOSD->TextString->DateFormat)+"\", ";
+          }
+          if(tmpOSD->TextString->PlainText!=NULL){
+            outStr+="\"PlainText\":\""+(*tmpOSD->TextString->PlainText)+"\", ";
+          }
+          if(tmpOSD->TextString->TimeFormat!=NULL){
+            outStr+="\"TimeFormat\":\""+(*tmpOSD->TextString->TimeFormat)+"\", ";
+          }
+          if(tmpOSD->TextString->FontSize!=NULL){
+            outStr+="\"FontSize\":\""+std::to_string(*tmpOSD->TextString->FontSize)+"\", ";
+          }
+          if(tmpOSD->TextString->BackgroundColor!=NULL){
+            outStr+="\"BackgroundColor\":{";
+            if(tmpOSD->TextString->BackgroundColor->Color!=NULL){
+              if(tmpOSD->TextString->BackgroundColor->Color->Colorspace!=NULL){
+                outStr+="\"Colorspace\":\""+(*tmpOSD->TextString->BackgroundColor->Color->Colorspace)+"\", ";
+              }
+              outStr+="\"X\":\""+std::to_string(tmpOSD->TextString->BackgroundColor->Color->X)+"\", ";
+              outStr+="\"Y\":\""+std::to_string(tmpOSD->TextString->BackgroundColor->Color->Y)+"\", ";
+              outStr+="\"Z\":\""+std::to_string(tmpOSD->TextString->BackgroundColor->Color->Z)+"\"";
+            }
+            if(tmpOSD->TextString->BackgroundColor->Transparent!=NULL){
+              outStr+="\"Transparent\":\""+std::to_string(*tmpOSD->TextString->BackgroundColor->Transparent)+"\"";
+            }
+            if(outStr.at(outStr.length()-1)==' ') outStr.erase (outStr.length()-2, 2);
+            outStr+="}, ";
+          }
+          if(tmpOSD->TextString->FontColor!=NULL){
+            outStr+="\"FontColor\":{";
+            if(tmpOSD->TextString->FontColor->Color!=NULL){
+              if(tmpOSD->TextString->FontColor->Color->Colorspace!=NULL){
+                outStr+="\"Colorspace\":\""+(*tmpOSD->TextString->FontColor->Color->Colorspace)+"\", ";
+              }
+              outStr+="\"X\":\""+std::to_string(tmpOSD->TextString->FontColor->Color->X)+"\", ";
+              outStr+="\"Y\":\""+std::to_string(tmpOSD->TextString->FontColor->Color->Y)+"\", ";
+              outStr+="\"Z\":\""+std::to_string(tmpOSD->TextString->FontColor->Color->Z)+"\"";
+            }
+            if(tmpOSD->TextString->FontColor->Transparent!=NULL){
+              outStr+="\"Transparent\":\""+std::to_string(*tmpOSD->TextString->FontColor->Transparent)+"\"";
+            }
+            if(outStr.at(outStr.length()-1)==' ') outStr.erase (outStr.length()-2, 2);
+            outStr+="}, ";
+          }
+          if(tmpOSD->TextString->IsPersistentText!=NULL){
+            outStr+="\"IsPersistentText\":\"";
+            if(*tmpOSD->TextString->IsPersistentText)outStr+="true";
+            else outStr+="false";
+            outStr+="\", ";
+          }
+          outStr+="\"Type\":\""+tmpOSD->TextString->Type+"\"";
+          if(outStr.at(outStr.length()-1)==' ') outStr.erase (outStr.length()-2, 2);
+          outStr+="}, ";
+        }
+        if(tmpOSD->VideoSourceConfigurationToken!=NULL){
+          outStr+="\"VideoSourceConfigurationToken\":\""+tmpOSD->VideoSourceConfigurationToken->__item+"\", ";
+        }
+        outStr+="\"Type\":\"";
+        switch(tmpOSD->Type){
+          case tt__OSDType__Text:
+            outStr+="Text\", ";
+            break;
+          case tt__OSDType__Image:
+            outStr+="Image\", ";
+            break;
+          case tt__OSDType__Extended:
+            outStr+="Extended\", ";
+            break;
+        }
+        outStr+="\"token\":\""+tmpOSD->token+"\"";
+        outStr+="}";
+      }
+      outStr+="]";
+    }
+    outStr+="}}";
+
+
+
+//End process response
 cleanSendResponse:
 
     soap_destroy(glSoap);
     soap_end(glSoap);
 
 sendResponse:
-  unsigned char data[outStr.length()+sHeader];
-  pHeader tmpHeader= (pHeader)data;
-  tmpHeader->dataLen=outStr.length();
-  tmpHeader->mesID=messageID;
-  tmpHeader->marker=ONVIF_PROT_MARKER;
-  memcpy(data+sHeader,(unsigned char*)outStr.c_str(),outStr.length());
-  sendData(fd, data, outStr.length()+sHeader);
+    unsigned char data[outStr.length()+sHeader];
+    pHeader tmpHeader= (pHeader)data;
+    tmpHeader->dataLen=outStr.length();
+    tmpHeader->mesID=messageID;
+    tmpHeader->marker=ONVIF_PROT_MARKER;
+    memcpy(data+sHeader,(unsigned char*)outStr.c_str(),outStr.length());
+    sendData(fd, data, outStr.length()+sHeader);
 }
 
 void execGetOSD(int fd, rapidjson::Document &d1, uint32_t messageID){
-  std::string outStr="{\"status\":\"ERROR\", \"reason\":\"Not implemented yet\"}";
-  goto cleanSendResponse;
-/*
-bool sendStop(ImagingBindingProxy* tProxyImaging, _timg__Stop * imagingSettings,
-                    _timg__StopResponse * imagingSettingsResponse);
-*/
+    std::string outStr;
+    std::string OSDToken="";
+    /*
+    bool sendGetOSD(MediaBindingProxy* tProxyMedia, _trt__GetOSD * imagingSettings,
+                    _trt__GetOSDResponse * imagingSettingsResponse);
+    */
+    _trt__GetOSD * GetOSD;
+    _trt__GetOSDResponse * GetOSDResponse;
 
+    if (d1.HasMember(CMD_PARAMS)){
+      if(d1[CMD_PARAMS].HasMember("OSDToken"))
+            OSDToken=std::string(d1[CMD_PARAMS]["OSDToken"].GetString());
+      else{
+        std::cout << "Failed to process request, No OSDToken found" << std::endl;
+        outStr="{\"status\":\"ERROR\", \"reason\":\"No OSDToken found\"}";
+        goto sendResponse;
+      }
+    }
+    else{
+      std::cout << "Failed to process request, No parameters found" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"No parameters found\"}";
+      goto sendResponse;
+    }
+
+    if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyMedia.soap, NULL, onvifLogin.c_str(), onvifPass.c_str())) {
+      std::cout << "Failed to assign user:password" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to assign user:password\"}";
+      goto sendResponse;
+    }
+
+    if (SOAP_OK != soap_wsse_add_Timestamp(proxyMedia.soap, "Time", 10)) {
+      std::cout << "Failed to set a timestamp" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to set a timestamp\"}";
+      goto sendResponse;
+    }
+
+    proxyMedia.soap->recv_timeout=ONVIF_WAIT_TIMEOUT;
+    proxyMedia.soap->send_timeout=ONVIF_WAIT_TIMEOUT;
+    proxyMedia.soap->connect_timeout=ONVIF_WAIT_TIMEOUT;
+
+
+    GetOSD = soap_new__trt__GetOSD(glSoap, -1);
+    GetOSDResponse = soap_new__trt__GetOSDResponse(glSoap, -1);
+    GetOSD->OSDToken=OSDToken;
+
+    if(false == sendGetOSD(&proxyMedia, GetOSD, GetOSDResponse)) {
+      if(verbosity>2)std::cout <<  "sendGetOSD failed all attempts" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetOSD failed all attempts\"}";
+      goto cleanSendResponse;
+    }
+//Process response
+    outStr="{\"status\":\"OK\", \"parameters\":{";
+    if(GetOSDResponse->OSD!=NULL){
+      outStr+="\"OSD\":{";
+        tt__OSDConfiguration* tmpOSD=GetOSDResponse->OSD;
+        if(tmpOSD->Position!=NULL){
+          outStr+="\"Position\":{";
+          if(tmpOSD->Position->Pos !=NULL){
+            outStr+="\"Pos\":{";
+            outStr+="\"x\":\""+std::to_string(*tmpOSD->Position->Pos->x)+"\", ";
+            outStr+="\"y\":\""+std::to_string(*tmpOSD->Position->Pos->y)+"\"";
+            outStr+="}, ";
+          }
+          outStr+="\"Type\":\""+tmpOSD->Position->Type+"\"";
+          if(outStr.at(outStr.length()-1)==' ') outStr.erase (outStr.length()-2, 2);
+          outStr+="}, ";
+        }
+        if(tmpOSD->TextString!=NULL){
+          outStr+="\"TextString\":{";
+          if(tmpOSD->TextString->DateFormat!=NULL){
+            outStr+="\"DateFormat\":\""+(*tmpOSD->TextString->DateFormat)+"\", ";
+          }
+          if(tmpOSD->TextString->PlainText!=NULL){
+            outStr+="\"PlainText\":\""+(*tmpOSD->TextString->PlainText)+"\", ";
+          }
+          if(tmpOSD->TextString->TimeFormat!=NULL){
+            outStr+="\"TimeFormat\":\""+(*tmpOSD->TextString->TimeFormat)+"\", ";
+          }
+          if(tmpOSD->TextString->FontSize!=NULL){
+            outStr+="\"FontSize\":\""+std::to_string(*tmpOSD->TextString->FontSize)+"\", ";
+          }
+          if(tmpOSD->TextString->BackgroundColor!=NULL){
+            outStr+="\"BackgroundColor\":{";
+            if(tmpOSD->TextString->BackgroundColor->Color!=NULL){
+              if(tmpOSD->TextString->BackgroundColor->Color->Colorspace!=NULL){
+                outStr+="\"Colorspace\":\""+(*tmpOSD->TextString->BackgroundColor->Color->Colorspace)+"\", ";
+              }
+              outStr+="\"X\":\""+std::to_string(tmpOSD->TextString->BackgroundColor->Color->X)+"\", ";
+              outStr+="\"Y\":\""+std::to_string(tmpOSD->TextString->BackgroundColor->Color->Y)+"\", ";
+              outStr+="\"Z\":\""+std::to_string(tmpOSD->TextString->BackgroundColor->Color->Z)+"\"";
+            }
+            if(tmpOSD->TextString->BackgroundColor->Transparent!=NULL){
+              outStr+="\"Transparent\":\""+std::to_string(*tmpOSD->TextString->BackgroundColor->Transparent)+"\"";
+            }
+            if(outStr.at(outStr.length()-1)==' ') outStr.erase (outStr.length()-2, 2);
+            outStr+="}, ";
+          }
+          if(tmpOSD->TextString->FontColor!=NULL){
+            outStr+="\"FontColor\":{";
+            if(tmpOSD->TextString->FontColor->Color!=NULL){
+              if(tmpOSD->TextString->FontColor->Color->Colorspace!=NULL){
+                outStr+="\"Colorspace\":\""+(*tmpOSD->TextString->FontColor->Color->Colorspace)+"\", ";
+              }
+              outStr+="\"X\":\""+std::to_string(tmpOSD->TextString->FontColor->Color->X)+"\", ";
+              outStr+="\"Y\":\""+std::to_string(tmpOSD->TextString->FontColor->Color->Y)+"\", ";
+              outStr+="\"Z\":\""+std::to_string(tmpOSD->TextString->FontColor->Color->Z)+"\"";
+            }
+            if(tmpOSD->TextString->FontColor->Transparent!=NULL){
+              outStr+="\"Transparent\":\""+std::to_string(*tmpOSD->TextString->FontColor->Transparent)+"\"";
+            }
+            if(outStr.at(outStr.length()-1)==' ') outStr.erase (outStr.length()-2, 2);
+            outStr+="}, ";
+          }
+          if(tmpOSD->TextString->IsPersistentText!=NULL){
+            outStr+="\"IsPersistentText\":\"";
+            if(*tmpOSD->TextString->IsPersistentText)outStr+="true";
+            else outStr+="false";
+            outStr+="\", ";
+          }
+          outStr+="\"Type\":\""+tmpOSD->TextString->Type+"\"";
+          if(outStr.at(outStr.length()-1)==' ') outStr.erase (outStr.length()-2, 2);
+          outStr+="}, ";
+        }
+        if(tmpOSD->VideoSourceConfigurationToken!=NULL){
+          outStr+="\"VideoSourceConfigurationToken\":\""+tmpOSD->VideoSourceConfigurationToken->__item+"\", ";
+        }
+        outStr+="\"Type\":\"";
+        switch(tmpOSD->Type){
+          case tt__OSDType__Text:
+            outStr+="Text\", ";
+            break;
+          case tt__OSDType__Image:
+            outStr+="Image\", ";
+            break;
+          case tt__OSDType__Extended:
+            outStr+="Extended\", ";
+            break;
+        }
+        outStr+="\"token\":\""+tmpOSD->token+"\"";
+        outStr+="}";
+    }
+    outStr+="}}";
+
+
+
+//End process response
 cleanSendResponse:
 
     soap_destroy(glSoap);
     soap_end(glSoap);
 
 sendResponse:
-  unsigned char data[outStr.length()+sHeader];
-  pHeader tmpHeader= (pHeader)data;
-  tmpHeader->dataLen=outStr.length();
-  tmpHeader->mesID=messageID;
-  tmpHeader->marker=ONVIF_PROT_MARKER;
-  memcpy(data+sHeader,(unsigned char*)outStr.c_str(),outStr.length());
-  sendData(fd, data, outStr.length()+sHeader);
+    unsigned char data[outStr.length()+sHeader];
+    pHeader tmpHeader= (pHeader)data;
+    tmpHeader->dataLen=outStr.length();
+    tmpHeader->mesID=messageID;
+    tmpHeader->marker=ONVIF_PROT_MARKER;
+    memcpy(data+sHeader,(unsigned char*)outStr.c_str(),outStr.length());
+    sendData(fd, data, outStr.length()+sHeader);
 }
 
 void execSetOSD(int fd, rapidjson::Document &d1, uint32_t messageID){
-  std::string outStr="{\"status\":\"ERROR\", \"reason\":\"Not implemented yet\"}";
-  goto cleanSendResponse;
 /*
-bool sendStop(ImagingBindingProxy* tProxyImaging, _timg__Stop * imagingSettings,
-                    _timg__StopResponse * imagingSettingsResponse);
+bool sendSetOSD(MediaBindingProxy* tProxyMedia, _trt__SetOSD * imagingSettings,
+                    _trt__SetOSDResponse * imagingSettingsResponse);
 */
+    std::string outStr="{\"status\":\"OK\"}";
+    std::string OSDToken="";
+    std::string tmpVar;
+    /*
+    bool sendGetOSD(MediaBindingProxy* tProxyMedia, _trt__GetOSD * imagingSettings,
+                    _trt__GetOSDResponse * imagingSettingsResponse);
+    */
+    _trt__GetOSD * GetOSD;
+    _trt__GetOSDResponse * GetOSDResponse;
+    _trt__SetOSD * SetOSD;
+    _trt__SetOSDResponse * SetOSDResponse;
+
+    if (d1.HasMember(CMD_PARAMS)){
+      if(d1[CMD_PARAMS].HasMember("OSDToken"))
+            OSDToken=std::string(d1[CMD_PARAMS]["OSDToken"].GetString());
+      else{
+        std::cout << "Failed to process request, No OSDToken found" << std::endl;
+        outStr="{\"status\":\"ERROR\", \"reason\":\"No OSDToken found\"}";
+        goto sendResponse;
+      }
+      if(!d1[CMD_PARAMS].HasMember("OSD")){
+        std::cout << "Failed to process request, No OSD found" << std::endl;
+        outStr="{\"status\":\"ERROR\", \"reason\":\"No OSD found\"}";
+        goto sendResponse;
+      }
+    }
+    else{
+      std::cout << "Failed to process request, No parameters found" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"No parameters found\"}";
+      goto sendResponse;
+    }
+
+    if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyMedia.soap, NULL, onvifLogin.c_str(), onvifPass.c_str())) {
+      std::cout << "Failed to assign user:password" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to assign user:password\"}";
+      goto sendResponse;
+    }
+
+    if (SOAP_OK != soap_wsse_add_Timestamp(proxyMedia.soap, "Time", 10)) {
+      std::cout << "Failed to set a timestamp" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to set a timestamp\"}";
+      goto sendResponse;
+    }
+
+    proxyMedia.soap->recv_timeout=ONVIF_WAIT_TIMEOUT;
+    proxyMedia.soap->send_timeout=ONVIF_WAIT_TIMEOUT;
+    proxyMedia.soap->connect_timeout=ONVIF_WAIT_TIMEOUT;
+
+
+    GetOSD = soap_new__trt__GetOSD(glSoap, -1);
+    GetOSDResponse = soap_new__trt__GetOSDResponse(glSoap, -1);
+    GetOSD->OSDToken=OSDToken;
+
+    if(false == sendGetOSD(&proxyMedia, GetOSD, GetOSDResponse)) {
+      if(verbosity>2)std::cout <<  "sendGetOSD failed all attempts" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetOSD failed all attempts\"}";
+      goto cleanSendResponse;
+    }
+
+    /*
+    if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyMedia.soap, NULL, onvifLogin.c_str(), onvifPass.c_str())) {
+      std::cout << "Failed to assign user:password" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to assign user:password\"}";
+      goto cleanSendResponse;
+    }
+    */
+
+    //SetOSD = soap_new__trt__SetOSD(glSoap, -1);
+    SetOSD = soap_new__trt__SetOSD(glSoap);
+    SetOSDResponse = soap_new__trt__SetOSDResponse(glSoap, -1);
+    //if(SetOSD->OSD!=NULL)SetOSD->OSD->soap_del();
+    //SetOSD->OSD=GetOSDResponse->OSD->soap_dup(glSoap);
+    SetOSD->OSD=GetOSDResponse->OSD;
+
+//Prepare request
+
+    if(SetOSD->OSD!=NULL){
+        tt__OSDConfiguration* tmpOSD=SetOSD->OSD;
+        if((tmpOSD->Position!=NULL) && (d1[CMD_PARAMS]["OSD"].HasMember("Position"))){
+          if((tmpOSD->Position->Pos!=NULL) && (d1[CMD_PARAMS]["OSD"]["Position"].HasMember("Pos"))){
+            tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["Position"]["Pos"]["x"].GetString());
+            (*tmpOSD->Position->Pos->x)=std::stof(tmpVar);
+            tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["Position"]["Pos"]["y"].GetString());
+            (*tmpOSD->Position->Pos->y)=std::stof(tmpVar);
+          }
+          if(d1[CMD_PARAMS]["OSD"]["Position"].HasMember("Type")){
+            tmpOSD->Position->Type=std::string(d1[CMD_PARAMS]["OSD"]["Position"]["Type"].GetString());
+          }
+        }
+        if((tmpOSD->TextString!=NULL) && (d1[CMD_PARAMS]["OSD"].HasMember("TextString"))){
+          if((tmpOSD->TextString->DateFormat!=NULL) && (d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("DateFormat"))){
+            (*tmpOSD->TextString->DateFormat)=
+                    std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["DateFormat"].GetString());
+          }
+          if((tmpOSD->TextString->PlainText!=NULL) && (d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("PlainText"))){
+            (*tmpOSD->TextString->PlainText)=
+                    std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["PlainText"].GetString());
+          }
+          if((tmpOSD->TextString->TimeFormat!=NULL) && (d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("TimeFormat"))){
+            (*tmpOSD->TextString->TimeFormat)=
+                    std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["TimeFormat"].GetString());
+          }
+          if((tmpOSD->TextString->FontSize!=NULL) && (d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("FontSize"))){
+            tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["FontSize"].GetString());
+            (*tmpOSD->TextString->FontSize)=std::stoi(tmpVar);
+          }
+          if((tmpOSD->TextString->IsPersistentText!=NULL) &&
+                            (d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("IsPersistentText"))){
+            tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["IsPersistentText"].GetString());
+            if(tmpVar=="true")(*tmpOSD->TextString->IsPersistentText)=true;
+            else (*tmpOSD->TextString->IsPersistentText)=false;
+          }
+          if(d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("Type")){
+            tmpOSD->TextString->Type=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["Type"].GetString());
+          }
+          if((tmpOSD->TextString->BackgroundColor!=NULL) &&
+                            (d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("BackgroundColor"))){
+            if((tmpOSD->TextString->BackgroundColor->Color!=NULL) &&
+                            (d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"].HasMember("Color"))){
+              if((tmpOSD->TextString->BackgroundColor->Color->Colorspace!=NULL) &&
+                      (d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"].HasMember("Colorspace"))){
+                (*tmpOSD->TextString->BackgroundColor->Color->Colorspace)=
+                std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"]["Colorspace"].GetString());
+              }
+              if((d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"].HasMember("X"))){
+                tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"]["X"].GetString());
+                tmpOSD->TextString->BackgroundColor->Color->X=std::stof(tmpVar);
+              }
+              if((d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"].HasMember("Y"))){
+                tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"]["Y"].GetString());
+                tmpOSD->TextString->BackgroundColor->Color->Y=std::stof(tmpVar);
+              }
+              if((d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"].HasMember("Z"))){
+                tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"]["Z"].GetString());
+                tmpOSD->TextString->BackgroundColor->Color->Z=std::stof(tmpVar);
+              }
+            }
+            if((tmpOSD->TextString->BackgroundColor->Transparent!=NULL) &&
+                            (d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"].HasMember("Transparent"))){
+              tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Transparent"].GetString());
+              (*tmpOSD->TextString->BackgroundColor->Transparent)=std::stoi(tmpVar);
+            }
+          }
+          if((tmpOSD->TextString->FontColor!=NULL) &&
+                            (d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("FontColor"))){
+            if((tmpOSD->TextString->FontColor->Color!=NULL) &&
+                            (d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"].HasMember("Color"))){
+              if((tmpOSD->TextString->FontColor->Color->Colorspace!=NULL) &&
+                      (d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"].HasMember("Colorspace"))){
+                (*tmpOSD->TextString->FontColor->Color->Colorspace)=
+                std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"]["Colorspace"].GetString());
+              }
+              if((d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"].HasMember("X"))){
+                tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"]["X"].GetString());
+                tmpOSD->TextString->FontColor->Color->X=std::stof(tmpVar);
+              }
+              if((d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"].HasMember("Y"))){
+                tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"]["Y"].GetString());
+                tmpOSD->TextString->FontColor->Color->Y=std::stof(tmpVar);
+              }
+              if((d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"].HasMember("Z"))){
+                tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"]["Z"].GetString());
+                tmpOSD->TextString->FontColor->Color->Z=std::stof(tmpVar);
+              }
+            }
+            if((tmpOSD->TextString->FontColor->Transparent!=NULL) &&
+                            (d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"].HasMember("Transparent"))){
+              tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Transparent"].GetString());
+              (*tmpOSD->TextString->FontColor->Transparent)=std::stoi(tmpVar);
+            }
+          }
+        }
+        if((tmpOSD->VideoSourceConfigurationToken!=NULL) &&
+                        (d1[CMD_PARAMS]["OSD"].HasMember("VideoSourceConfigurationToken"))){
+          (tmpOSD->VideoSourceConfigurationToken->__item)=
+            std::string(d1[CMD_PARAMS]["OSD"]["VideoSourceConfigurationToken"].GetString());
+        }
+        if(d1[CMD_PARAMS]["OSD"].HasMember("Type")){
+          tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["Type"].GetString());
+          if(tmpVar=="Text")tmpOSD->Type=tt__OSDType__Text;
+          if(tmpVar=="Image")tmpOSD->Type=tt__OSDType__Image;
+          if(tmpVar=="Extended")tmpOSD->Type=tt__OSDType__Extended;
+        }
+    }
+    else{
+      std::cout << "Failed to get valid OSD" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to get valid OSD\"}";
+      goto cleanSendResponse;
+    }
+
+//End prepare request
+
+    if(false == sendSetOSD(&proxyMedia, SetOSD, SetOSDResponse)) {
+      if(verbosity>2)std::cout <<  "sendSetOSD failed all attempts" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"sendSetOSD failed all attempts\"}";
+      goto cleanSendResponse;
+    }
+
 
 cleanSendResponse:
 
@@ -1218,14 +1740,280 @@ cleanSendResponse:
     soap_end(glSoap);
 
 sendResponse:
-  unsigned char data[outStr.length()+sHeader];
-  pHeader tmpHeader= (pHeader)data;
-  tmpHeader->dataLen=outStr.length();
-  tmpHeader->mesID=messageID;
-  tmpHeader->marker=ONVIF_PROT_MARKER;
-  memcpy(data+sHeader,(unsigned char*)outStr.c_str(),outStr.length());
-  sendData(fd, data, outStr.length()+sHeader);
+    unsigned char data[outStr.length()+sHeader];
+    pHeader tmpHeader= (pHeader)data;
+    tmpHeader->dataLen=outStr.length();
+    tmpHeader->mesID=messageID;
+    tmpHeader->marker=ONVIF_PROT_MARKER;
+    memcpy(data+sHeader,(unsigned char*)outStr.c_str(),outStr.length());
+    sendData(fd, data, outStr.length()+sHeader);
 }
+
+void execCreateOSD(int fd, rapidjson::Document &d1, uint32_t messageID){
+    std::string outStr="{\"status\":\"OK\"}";
+    std::string tmpVar;
+    float x,y;
+    std::string dateFormat, timeFormat, plainText, bColorspace, fColorspace;
+    int fontSize, bTransparent, fTransparent;
+    bool isPersistentText;
+
+    _trt__CreateOSD * CreateOSD;
+    _trt__CreateOSDResponse * CreateOSDResponse;
+    tt__OSDConfiguration* tmpOSD;
+
+    if (d1.HasMember(CMD_PARAMS)){
+      if(!d1[CMD_PARAMS].HasMember("OSD")){
+        std::cout << "Failed to process request, No OSD found" << std::endl;
+        outStr="{\"status\":\"ERROR\", \"reason\":\"No OSD found\"}";
+        goto sendResponse;
+      }
+    }
+    else{
+      std::cout << "Failed to process request, No parameters found" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"No parameters found\"}";
+      goto sendResponse;
+    }
+
+    if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyMedia.soap, NULL, onvifLogin.c_str(), onvifPass.c_str())) {
+      std::cout << "Failed to assign user:password" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to assign user:password\"}";
+      goto sendResponse;
+    }
+
+    if (SOAP_OK != soap_wsse_add_Timestamp(proxyMedia.soap, "Time", 10)) {
+      std::cout << "Failed to set a timestamp" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to set a timestamp\"}";
+      goto sendResponse;
+    }
+
+    proxyMedia.soap->recv_timeout=ONVIF_WAIT_TIMEOUT;
+    proxyMedia.soap->send_timeout=ONVIF_WAIT_TIMEOUT;
+    proxyMedia.soap->connect_timeout=ONVIF_WAIT_TIMEOUT;
+
+
+
+    CreateOSD = soap_new__trt__CreateOSD(glSoap, -1);
+    CreateOSDResponse = soap_new__trt__CreateOSDResponse(glSoap, -1);
+    CreateOSD->OSD=soap_new_tt__OSDConfiguration(glSoap, -1);
+
+//Prepare request
+  tmpOSD=CreateOSD->OSD;
+  if(d1[CMD_PARAMS]["OSD"].HasMember("Position")){
+    tmpOSD->Position=soap_new_tt__OSDPosConfiguration(glSoap, -1);
+    if(d1[CMD_PARAMS]["OSD"]["Position"].HasMember("Pos")){
+      //tmpOSD->Position->Pos=soap_new_set_tt__Vector();
+      //tmpOSD->Position->Pos=soap_new_tt__Vector(glSoap, -1);
+      tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["Position"]["Pos"]["x"].GetString());
+      x=std::stof(tmpVar);
+      //(*tmpOSD->Position->Pos->x)=std::stof(tmpVar);
+      tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["Position"]["Pos"]["y"].GetString());
+      y=std::stof(tmpVar);
+      //(*tmpOSD->Position->Pos->y)=std::stof(tmpVar);
+      tmpOSD->Position->Pos=soap_new_set_tt__Vector(glSoap,&x,&y);
+    }
+    if(d1[CMD_PARAMS]["OSD"]["Position"].HasMember("Type")){
+      tmpOSD->Position->Type=std::string(d1[CMD_PARAMS]["OSD"]["Position"]["Type"].GetString());
+    }
+  }
+  if(d1[CMD_PARAMS]["OSD"].HasMember("TextString")){
+    tmpOSD->TextString=soap_new_tt__OSDTextConfiguration(glSoap,-1);
+    if(d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("DateFormat")){
+      dateFormat=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["DateFormat"].GetString());
+      tmpOSD->TextString->DateFormat=&dateFormat;
+    }
+    if(d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("PlainText")){
+      plainText=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["PlainText"].GetString());
+     tmpOSD->TextString->PlainText=&plainText;
+    }
+    if(d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("TimeFormat")){
+      timeFormat=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["TimeFormat"].GetString());
+      tmpOSD->TextString->TimeFormat=&dateFormat;
+    }
+    if(d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("FontSize")){
+      tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["FontSize"].GetString());
+      fontSize=std::stoi(tmpVar);
+      tmpOSD->TextString->FontSize=&fontSize;
+    }
+    if(d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("IsPersistentText")){
+      tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["IsPersistentText"].GetString());
+      if(tmpVar=="true")isPersistentText=true;
+      else isPersistentText=false;
+      tmpOSD->TextString->IsPersistentText=&isPersistentText;
+    }
+    if(d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("Type")){
+      tmpOSD->TextString->Type=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["Type"].GetString());
+    }
+    if(d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("BackgroundColor")){
+      tmpOSD->TextString->BackgroundColor=soap_new_tt__OSDColor(glSoap,-1);
+      if(d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"].HasMember("Color")){
+        tmpOSD->TextString->BackgroundColor->Color=soap_new_tt__Color(glSoap,-1);
+        if(d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"].HasMember("Colorspace")){
+          bColorspace=
+               std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"]["Colorspace"].GetString());
+          tmpOSD->TextString->BackgroundColor->Color->Colorspace=&bColorspace;
+        }
+        if((d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"].HasMember("X"))){
+          tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"]["X"].GetString());
+          tmpOSD->TextString->BackgroundColor->Color->X=std::stof(tmpVar);
+        }
+        if((d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"].HasMember("Y"))){
+          tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"]["Y"].GetString());
+          tmpOSD->TextString->BackgroundColor->Color->Y=std::stof(tmpVar);
+        }
+        if((d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"].HasMember("Z"))){
+          tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Color"]["Z"].GetString());
+          tmpOSD->TextString->BackgroundColor->Color->Z=std::stof(tmpVar);
+        }
+      }
+      if(d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"].HasMember("Transparent")){
+        tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["BackgroundColor"]["Transparent"].GetString());
+        bTransparent=std::stoi(tmpVar);
+        tmpOSD->TextString->BackgroundColor->Transparent=&bTransparent;
+      }
+    }
+
+    if(d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("FontColor")){
+      tmpOSD->TextString->FontColor=soap_new_tt__OSDColor(glSoap,-1);
+      if(d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"].HasMember("Color")){
+        tmpOSD->TextString->FontColor->Color=soap_new_tt__Color(glSoap,-1);
+        if(d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"].HasMember("Colorspace")){
+          fColorspace=
+               std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"]["Colorspace"].GetString());
+          tmpOSD->TextString->FontColor->Color->Colorspace=&bColorspace;
+        }
+        if((d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"].HasMember("X"))){
+          tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"]["X"].GetString());
+          tmpOSD->TextString->FontColor->Color->X=std::stof(tmpVar);
+        }
+        if((d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"].HasMember("Y"))){
+          tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"]["Y"].GetString());
+          tmpOSD->TextString->FontColor->Color->Y=std::stof(tmpVar);
+        }
+        if((d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"].HasMember("Z"))){
+          tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Color"]["Z"].GetString());
+          tmpOSD->TextString->FontColor->Color->Z=std::stof(tmpVar);
+        }
+      }
+      if(d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"].HasMember("Transparent")){
+        tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["FontColor"]["Transparent"].GetString());
+        fTransparent=std::stoi(tmpVar);
+        tmpOSD->TextString->FontColor->Transparent=&bTransparent;
+      }
+    }
+  }
+  tmpOSD->VideoSourceConfigurationToken=soap_new_tt__OSDReference(glSoap, -1);
+  if(d1[CMD_PARAMS]["OSD"].HasMember("VideoSourceConfigurationToken")){
+    tmpOSD->VideoSourceConfigurationToken->__item=
+      std::string(d1[CMD_PARAMS]["OSD"]["VideoSourceConfigurationToken"].GetString());
+  }
+  else{
+    tmpOSD->VideoSourceConfigurationToken->__item=videoSources[0];
+  }
+  if(d1[CMD_PARAMS]["OSD"].HasMember("Type")){
+    tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["Type"].GetString());
+    if(tmpVar=="Text")tmpOSD->Type=tt__OSDType__Text;
+    if(tmpVar=="Image")tmpOSD->Type=tt__OSDType__Image;
+    if(tmpVar=="Extended")tmpOSD->Type=tt__OSDType__Extended;
+  }
+  if(d1[CMD_PARAMS]["OSD"].HasMember("token")){
+    tmpOSD->token=
+      std::string(d1[CMD_PARAMS]["OSD"]["token"].GetString());
+  }
+
+//End prepare request
+
+    if(false == sendCreateOSD(&proxyMedia, CreateOSD, CreateOSDResponse)) {
+      if(verbosity>2)std::cout <<  "sendCreateOSD failed all attempts" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"sendCreateOSD failed all attempts\"}";
+      goto cleanSendResponse;
+    }
+
+
+cleanSendResponse:
+
+    soap_destroy(glSoap);
+    soap_end(glSoap);
+
+sendResponse:
+    unsigned char data[outStr.length()+sHeader];
+    pHeader tmpHeader= (pHeader)data;
+    tmpHeader->dataLen=outStr.length();
+    tmpHeader->mesID=messageID;
+    tmpHeader->marker=ONVIF_PROT_MARKER;
+    memcpy(data+sHeader,(unsigned char*)outStr.c_str(),outStr.length());
+    sendData(fd, data, outStr.length()+sHeader);
+}
+
+void execDeleteOSD(int fd, rapidjson::Document &d1, uint32_t messageID){
+    std::string outStr;
+    std::string OSDToken="";
+    /*
+    bool sendGetOSD(MediaBindingProxy* tProxyMedia, _trt__GetOSD * imagingSettings,
+                    _trt__GetOSDResponse * imagingSettingsResponse);
+    */
+    _trt__DeleteOSD * DeleteOSD;
+    _trt__DeleteOSDResponse * DeleteOSDResponse;
+
+    if (d1.HasMember(CMD_PARAMS)){
+      if(d1[CMD_PARAMS].HasMember("OSDToken"))
+            OSDToken=std::string(d1[CMD_PARAMS]["OSDToken"].GetString());
+      else{
+        std::cout << "Failed to process request, No OSDToken found" << std::endl;
+        outStr="{\"status\":\"ERROR\", \"reason\":\"No OSDToken found\"}";
+        goto sendResponse;
+      }
+    }
+    else{
+      std::cout << "Failed to process request, No parameters found" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"No parameters found\"}";
+      goto sendResponse;
+    }
+
+    if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyMedia.soap, NULL, onvifLogin.c_str(), onvifPass.c_str())) {
+      std::cout << "Failed to assign user:password" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to assign user:password\"}";
+      goto sendResponse;
+    }
+
+    if (SOAP_OK != soap_wsse_add_Timestamp(proxyMedia.soap, "Time", 10)) {
+      std::cout << "Failed to set a timestamp" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to set a timestamp\"}";
+      goto sendResponse;
+    }
+
+    proxyMedia.soap->recv_timeout=ONVIF_WAIT_TIMEOUT;
+    proxyMedia.soap->send_timeout=ONVIF_WAIT_TIMEOUT;
+    proxyMedia.soap->connect_timeout=ONVIF_WAIT_TIMEOUT;
+
+
+    DeleteOSD = soap_new__trt__DeleteOSD(glSoap, -1);
+    DeleteOSDResponse = soap_new__trt__DeleteOSDResponse(glSoap, -1);
+    DeleteOSD->OSDToken=OSDToken;
+
+    if(false == sendDeleteOSD(&proxyMedia, DeleteOSD, DeleteOSDResponse)) {
+      if(verbosity>2)std::cout <<  "sendDeleteOSD failed all attempts" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"sendDeleteOSD failed all attempts\"}";
+      goto cleanSendResponse;
+    }
+//Process response
+    outStr="{\"status\":\"OK\"}";
+
+//End process response
+cleanSendResponse:
+
+    soap_destroy(glSoap);
+    soap_end(glSoap);
+
+sendResponse:
+    unsigned char data[outStr.length()+sHeader];
+    pHeader tmpHeader= (pHeader)data;
+    tmpHeader->dataLen=outStr.length();
+    tmpHeader->mesID=messageID;
+    tmpHeader->marker=ONVIF_PROT_MARKER;
+    memcpy(data+sHeader,(unsigned char*)outStr.c_str(),outStr.length());
+    sendData(fd, data, outStr.length()+sHeader);
+}
+
 
 void execGetOSDOptions(int fd, rapidjson::Document &d1, uint32_t messageID){
   unsigned char data[cachedOSDOptionsResponse.length()+sHeader];
@@ -1309,9 +2097,24 @@ sendResponse:
 
 void execMove(int fd, rapidjson::Document &d1, uint32_t messageID){
     std::string outStr="{\"status\":\"OK\"}";
+    std::string tmpVar;
+    float aspeed, rspeed, cspeed;
 
     _timg__Move * GetMove;
     _timg__MoveResponse * GetMoveResponse;
+
+    if (d1.HasMember(CMD_PARAMS)){
+      if(!d1[CMD_PARAMS].HasMember("Focus")){
+        std::cout << "Failed to process request, No Focus found" << std::endl;
+        outStr="{\"status\":\"ERROR\", \"reason\":\"No Focus found\"}";
+        goto sendResponse;
+      }
+    }
+    else{
+      std::cout << "Failed to process request, No parameters found" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"No parameters found\"}";
+      goto sendResponse;
+    }
 
     if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyImaging.soap, NULL, onvifLogin.c_str(), onvifPass.c_str())) {
       std::cout << "Failed to assign user:password" << std::endl;
@@ -1329,14 +2132,44 @@ void execMove(int fd, rapidjson::Document &d1, uint32_t messageID){
     proxyImaging.soap->send_timeout=ONVIF_WAIT_TIMEOUT;
     proxyImaging.soap->connect_timeout=ONVIF_WAIT_TIMEOUT;
 
-
     GetMove = soap_new__timg__Move(glSoap, -1);
     GetMoveResponse = soap_new__timg__MoveResponse(glSoap, -1);
     GetMove->VideoSourceToken=videoSources[0];
-/*
-{"status":"OK", "parameters":{"Absolute":{"Position":{"Min":"0.000000", "Max":"100.000000"}, "Speed":{"Min":"-100.000000", "Max":"100.000000"}}, "Relative":{"Distance":{"Min":"-100.000000", "Max":"100.000000"}, "Speed":{"Min":"-100.000000", "Max":"100.000000"}}, "Continuous":{"Speed":{"Min":"-100.000000", "Max":"100.000000"}}}}
-*/
+    GetMove->Focus=soap_new_tt__FocusMove(glSoap, -1);
 
+//Prepare request
+  if(d1[CMD_PARAMS]["Focus"].HasMember("Absolute")){
+    GetMove->Focus->Absolute=soap_new_tt__AbsoluteFocus(glSoap, -1);
+    if(d1[CMD_PARAMS]["Focus"]["Absolute"].HasMember("Speed")){
+      tmpVar=std::string(d1[CMD_PARAMS]["Focus"]["Absolute"]["Speed"].GetString());
+      aspeed=std::stof(tmpVar);
+      GetMove->Focus->Absolute->Speed=&aspeed;
+    }
+    if(d1[CMD_PARAMS]["Focus"]["Absolute"].HasMember("Position")){
+      tmpVar=std::string(d1[CMD_PARAMS]["Focus"]["Absolute"]["Position"].GetString());
+      GetMove->Focus->Absolute->Position=std::stof(tmpVar);
+    }
+  }
+  if(d1[CMD_PARAMS]["Focus"].HasMember("Relative")){
+    GetMove->Focus->Relative=soap_new_tt__RelativeFocus(glSoap, -1);
+    if(d1[CMD_PARAMS]["Focus"]["Relative"].HasMember("Speed")){
+      tmpVar=std::string(d1[CMD_PARAMS]["Focus"]["Relative"]["Speed"].GetString());
+      rspeed=std::stof(tmpVar);
+      GetMove->Focus->Relative->Speed=&rspeed;
+    }
+    if(d1[CMD_PARAMS]["Focus"]["Relative"].HasMember("Distance")){
+      tmpVar=std::string(d1[CMD_PARAMS]["Focus"]["Relative"]["Distance"].GetString());
+      GetMove->Focus->Relative->Distance=std::stof(tmpVar);
+    }
+  }
+  if(d1[CMD_PARAMS]["Focus"].HasMember("Continuous")){
+    GetMove->Focus->Continuous=soap_new_tt__ContinuousFocus(glSoap, -1);
+    if(d1[CMD_PARAMS]["Focus"]["Continuous"].HasMember("Speed")){
+      tmpVar=std::string(d1[CMD_PARAMS]["Focus"]["Continuous"]["Speed"].GetString());
+      GetMove->Focus->Continuous->Speed=std::stof(tmpVar);
+    }
+  }
+//End Prepare request
 
     if(false == sendMove(&proxyImaging, GetMove, GetMoveResponse)) {
       if(verbosity>2)std::cout <<  "sendMove failed all attempts" << std::endl;
@@ -1727,7 +2560,6 @@ std::string prepareOSDOptionsResponse(_trt__GetOSDOptionsResponse* OSDOptionsRes
     outStr+="\"Total\":\""+ std::to_string(OSDOptionsResponse->OSDOptions->MaximumNumberOfOSDs->Total)+"\"";
     outStr+="}, ";
   }
-
   if(outStr.at(outStr.length()-1)==' ') outStr.erase (outStr.length()-2, 2);
   outStr+="}}";
   return outStr;
@@ -1893,7 +2725,7 @@ void setupClientSocket(int sockfd){
 void processReceivedData(int fd, std::string message, uint32_t messageID){
     rapidjson::Document d1;
     std::string command="";
-    std::string outStr="{\"status\":\"ERROR\", \"reason\":\"Unknown command\"}";
+    std::string outStr="{\"status\":\"ERROR\", \"reason\":\"Unknown or unsupported command\"}";
 
     if (!d1.Parse(message.c_str()).HasParseError()) {
         if (d1.HasMember(CMD_COMMAND)){
@@ -1913,15 +2745,23 @@ void processReceivedData(int fd, std::string message, uint32_t messageID){
     if (verbosity>3) fprintf(stderr,"%s processReceivedData: : Executing command: %s\n",
                               getTimeStamp().c_str(), message.c_str());
 
-    if(command=="GetImagingSettings") return execGetImagingSettings(fd, d1, messageID);
-    if(command=="SetImagingSettings") return execSetImagingSettings(fd, d1, messageID);
-    if(command=="GetOptions") return execGetOptions(fd, d1, messageID);
-    if(command=="GetMoveOptions") return execGetMoveOptions(fd, d1, messageID);
-    if(command=="Stop") return execStop(fd, d1, messageID);
-    if(command=="Move") return execMove(fd, d1, messageID);
+    if((command=="GetImagingSettings") && (proxyImaging.soap_endpoint != "NOTAVAILABLE"))
+                      return execGetImagingSettings(fd, d1, messageID);
+    if((command=="SetImagingSettings") && (proxyImaging.soap_endpoint != "NOTAVAILABLE"))
+                      return execSetImagingSettings(fd, d1, messageID);
+    if((command=="GetOptions")  && (proxyImaging.soap_endpoint != "NOTAVAILABLE"))
+                      return execGetOptions(fd, d1, messageID);
+    if((command=="GetMoveOptions") && (proxyImaging.soap_endpoint != "NOTAVAILABLE"))
+                      return execGetMoveOptions(fd, d1, messageID);
+    if((command=="Stop")  && (proxyImaging.soap_endpoint != "NOTAVAILABLE"))
+                      return execStop(fd, d1, messageID);
+    if((command=="Move")  && (proxyImaging.soap_endpoint != "NOTAVAILABLE"))
+                      return execMove(fd, d1, messageID);
     if(command=="SystemReboot") return execSystemReboot(fd, d1, messageID);
     if(command=="GetOSDs") return execGetOSDs(fd, d1, messageID);
     if(command=="GetOSD") return execGetOSD(fd, d1, messageID);
+    if(command=="CreateOSD") return execCreateOSD(fd, d1, messageID);
+    if(command=="DeleteOSD") return execDeleteOSD(fd, d1, messageID);
     if(command=="SetOSD") return execSetOSD(fd, d1, messageID);
     if(command=="GetOSDOptions") return execGetOSDOptions(fd, d1, messageID);
 
@@ -2202,58 +3042,70 @@ int main(int argc, char **argv)
     soap_end(glSoap);
 
 
-//Imaging Options
+//Imaging:
+    if(proxyImaging.soap_endpoint != "NOTAVAILABLE"){
+  //Imaging Options
+      if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyImaging.soap, NULL,
+                                                        onvifLogin.c_str(), onvifPass.c_str())) {
+        std::cout << "Failed to assign user:password" << std::endl;
+        return -1;
+      }
+
+      if (SOAP_OK != soap_wsse_add_Timestamp(proxyImaging.soap, "Time", 10)) {
+        std::cout << "Failed to set a timestamp" << std::endl;
+        return -2;
+      }
+
+      proxyImaging.soap->recv_timeout=ONVIF_WAIT_TIMEOUT;
+      proxyImaging.soap->send_timeout=ONVIF_WAIT_TIMEOUT;
+      proxyImaging.soap->connect_timeout=ONVIF_WAIT_TIMEOUT;
 
 
-    if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyImaging.soap, NULL, onvifLogin.c_str(), onvifPass.c_str())) {
-      std::cout << "Failed to assign user:password" << std::endl;
-      return -1;
+      _timg__GetOptions *tmpGetOptions = soap_new__timg__GetOptions(glSoap, -1);
+      _timg__GetOptionsResponse* tmpGetOptionsResponse = soap_new__timg__GetOptionsResponse(glSoap, -1);
+      tmpGetOptions->VideoSourceToken=videoSources[0];
+
+      if(false == sendGetOptions(&proxyImaging, tmpGetOptions, tmpGetOptionsResponse)) {
+        if(verbosity>2)std::cout <<  "sendGetOptions failed all attempts" << std::endl;
+        return -12;
+      }
+
+      cachedImagingOptionsResponse=prepareOptionsResponse(tmpGetOptionsResponse);
+
+      soap_destroy(glSoap);
+      soap_end(glSoap);
+
+  //Imaging move options
+      if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyImaging.soap, NULL, onvifLogin.c_str(),
+                                                        onvifPass.c_str())) {
+        std::cout << "Failed to assign user:password" << std::endl;
+        return -1;
+      }
+
+
+      _timg__GetMoveOptions *tmpGetMoveOptions = soap_new__timg__GetMoveOptions(glSoap, -1);
+      _timg__GetMoveOptionsResponse* tmpGetMoveOptionsResponse = soap_new__timg__GetMoveOptionsResponse(glSoap, -1);
+      tmpGetMoveOptions->VideoSourceToken=videoSources[0];
+
+      if(false == sendGetMoveOptions(&proxyImaging, tmpGetMoveOptions, tmpGetMoveOptionsResponse)) {
+        if(verbosity>2)std::cout <<  "sendGetMoveOptions failed all attempts" << std::endl;
+        return -11;
+      }
+
+      cachedMoveOptionsResponse=prepareMoveOptionsResponse(tmpGetMoveOptionsResponse);
+
+      soap_destroy(glSoap);
+      soap_end(glSoap);
+
     }
 
-    if (SOAP_OK != soap_wsse_add_Timestamp(proxyImaging.soap, "Time", 10)) {
-      std::cout << "Failed to set a timestamp" << std::endl;
-      return -2;
+
+//PTZ:
+    if(proxyPTZ.soap_endpoint != "NOTAVAILABLE"){
+
+
+
     }
-
-    proxyImaging.soap->recv_timeout=ONVIF_WAIT_TIMEOUT;
-    proxyImaging.soap->send_timeout=ONVIF_WAIT_TIMEOUT;
-    proxyImaging.soap->connect_timeout=ONVIF_WAIT_TIMEOUT;
-
-
-    _timg__GetOptions *tmpGetOptions = soap_new__timg__GetOptions(glSoap, -1);
-    _timg__GetOptionsResponse* tmpGetOptionsResponse = soap_new__timg__GetOptionsResponse(glSoap, -1);
-    tmpGetOptions->VideoSourceToken=videoSources[0];
-
-    if(false == sendGetOptions(&proxyImaging, tmpGetOptions, tmpGetOptionsResponse)) {
-      if(verbosity>2)std::cout <<  "sendGetOptions failed all attempts" << std::endl;
-      return -12;
-    }
-
-    cachedImagingOptionsResponse=prepareOptionsResponse(tmpGetOptionsResponse);
-
-    soap_destroy(glSoap);
-    soap_end(glSoap);
-
-//Imaging move options
-    if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyImaging.soap, NULL, onvifLogin.c_str(), onvifPass.c_str())) {
-      std::cout << "Failed to assign user:password" << std::endl;
-      return -1;
-    }
-
-
-    _timg__GetMoveOptions *tmpGetMoveOptions = soap_new__timg__GetMoveOptions(glSoap, -1);
-    _timg__GetMoveOptionsResponse* tmpGetMoveOptionsResponse = soap_new__timg__GetMoveOptionsResponse(glSoap, -1);
-    tmpGetMoveOptions->VideoSourceToken=videoSources[0];
-
-    if(false == sendGetMoveOptions(&proxyImaging, tmpGetMoveOptions, tmpGetMoveOptionsResponse)) {
-      if(verbosity>2)std::cout <<  "sendGetMoveOptions failed all attempts" << std::endl;
-      return -11;
-    }
-
-    cachedMoveOptionsResponse=prepareMoveOptionsResponse(tmpGetMoveOptionsResponse);
-
-    soap_destroy(glSoap);
-    soap_end(glSoap);
 
 //Network setup
     int  maxfd, sockfd, clifd;
