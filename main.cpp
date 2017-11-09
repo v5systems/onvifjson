@@ -168,6 +168,8 @@ bool sendGetOptions(ImagingBindingProxy* tProxyImaging, _timg__GetOptions * imag
                     _timg__GetOptionsResponse * imagingSettingsResponse);
 bool sendGetMoveOptions(ImagingBindingProxy* tProxyImaging, _timg__GetMoveOptions * imagingSettings,
                     _timg__GetMoveOptionsResponse * imagingSettingsResponse);
+bool sendGetStatus(ImagingBindingProxy* tProxyImaging, _timg__GetStatus * imagingSettings,
+                    _timg__GetStatusResponse * imagingSettingsResponse);
 bool sendGetOSDOptions(MediaBindingProxy* tProxyMedia, _trt__GetOSDOptions * imagingSettings,
                     _trt__GetOSDOptionsResponse * imagingSettingsResponse);
 bool sendStop(ImagingBindingProxy* tProxyImaging, _timg__Stop * imagingSettings,
@@ -592,6 +594,33 @@ bool sendGetMoveOptions(ImagingBindingProxy* tProxyImaging, _timg__GetMoveOption
   }
 }
 
+
+bool sendGetStatus(ImagingBindingProxy* tProxyImaging, _timg__GetStatus * imagingSettings,
+                    _timg__GetStatusResponse * imagingSettingsResponse) {
+  static int tCount=0;
+  tCount++;
+  if(tCount > RETRIES){
+    tCount = 0;
+    return false;
+  }
+
+  int result = tProxyImaging->GetStatus(imagingSettings, *imagingSettingsResponse);
+  if (result == SOAP_OK) {
+    if(verbosity>2) {
+      fprintf(stderr, "GetStatus Found: \n");
+    }
+    tCount = 0;
+    return true;
+  } else {
+    if(verbosity>2)std::cout <<  "sendGetStatus return result: " << result << std::endl;
+    if(verbosity>1)printError(tProxyImaging->soap);
+    tProxyImaging->soap->userid = onvifLogin.c_str();
+    tProxyImaging->soap->passwd = onvifPass.c_str();
+    return sendGetStatus(tProxyImaging, imagingSettings, imagingSettingsResponse);
+  }
+}
+
+
 bool sendStop(ImagingBindingProxy* tProxyImaging, _timg__Stop * imagingSettings,
                     _timg__StopResponse * imagingSettingsResponse) {
   static int tCount=0;
@@ -945,6 +974,83 @@ void execGetImagingSettings(int fd, rapidjson::Document &d1, uint32_t messageID)
       }
       if(outStr.at(outStr.length()-1)==' ') outStr.erase (outStr.length()-2, 2);
       outStr+="}, ";
+    }
+    if(outStr.at(outStr.length()-1)==' ') outStr.erase (outStr.length()-2, 2);
+    outStr+="}}";
+
+
+//End process response
+cleanSendResponse:
+
+    soap_destroy(glSoap);
+    soap_end(glSoap);
+
+sendResponse:
+  unsigned char data[outStr.length()+sHeader];
+  pHeader tmpHeader= (pHeader)data;
+  tmpHeader->dataLen=outStr.length();
+  tmpHeader->mesID=messageID;
+  tmpHeader->marker=ONVIF_PROT_MARKER;
+  memcpy(data+sHeader,(unsigned char*)outStr.c_str(),outStr.length());
+  sendData(fd, data, outStr.length()+sHeader);
+}
+
+
+void execGetStatus(int fd, rapidjson::Document &d1, uint32_t messageID){
+    std::string outStr;
+    _timg__GetStatus * GetStatus;
+    _timg__GetStatusResponse * GetStatusResponse;
+
+    if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyImaging.soap, NULL, onvifLogin.c_str(), onvifPass.c_str())) {
+      std::cout << "Failed to assign user:password" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to assign user:password\"}";
+      goto sendResponse;
+    }
+
+    if (SOAP_OK != soap_wsse_add_Timestamp(proxyImaging.soap, "Time", 10)) {
+      std::cout << "Failed to set a timestamp" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to set a timestamp\"}";
+      goto sendResponse;
+    }
+
+    proxyImaging.soap->recv_timeout=ONVIF_WAIT_TIMEOUT;
+    proxyImaging.soap->send_timeout=ONVIF_WAIT_TIMEOUT;
+    proxyImaging.soap->connect_timeout=ONVIF_WAIT_TIMEOUT;
+
+
+    GetStatus = soap_new__timg__GetStatus(glSoap, -1);
+    GetStatusResponse = soap_new__timg__GetStatusResponse(glSoap, -1);
+    GetStatus->VideoSourceToken=videoSources[0];
+
+    if(false == sendGetStatus(&proxyImaging, GetStatus, GetStatusResponse)) {
+      if(verbosity>2)std::cout <<  "sendGetStatus failed all attempts" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetStatus failed all attempts\"}";
+      goto cleanSendResponse;
+    }
+//Process response
+    outStr="{\"status\":\"OK\", \"parameters\":{";
+
+    if(GetStatusResponse->Status!=NULL){
+      outStr+="\"Status\":{";
+      if(GetStatusResponse->Status->FocusStatus20 !=NULL){
+        outStr+="\"FocusStatus20\":{";
+        if(GetStatusResponse->Status->FocusStatus20->Error !=NULL){
+          outStr+="\"Error\":\""+ (*GetStatusResponse->Status->FocusStatus20->Error)+"\", ";
+        }
+        outStr+="\"MoveStatus\":\"";
+        if(GetStatusResponse->Status->FocusStatus20->MoveStatus==tt__MoveStatus__IDLE)
+          outStr+="IDLE\", ";
+        else if(GetStatusResponse->Status->FocusStatus20->MoveStatus==tt__MoveStatus__MOVING)
+          outStr+="MOVING\", ";
+        else if(GetStatusResponse->Status->FocusStatus20->MoveStatus==tt__MoveStatus__UNKNOWN)
+          outStr+="UNKNOWN\", ";
+        else outStr+="UNKNOWN\", ";
+        outStr+="\"Position\":\""+
+            std::to_string(GetStatusResponse->Status->FocusStatus20->Position)+"\"";
+        outStr+="}";
+      }
+      if(outStr.at(outStr.length()-1)==' ') outStr.erase (outStr.length()-2, 2);
+      outStr+="}";
     }
     if(outStr.at(outStr.length()-1)==' ') outStr.erase (outStr.length()-2, 2);
     outStr+="}}";
@@ -2757,6 +2863,8 @@ void processReceivedData(int fd, std::string message, uint32_t messageID){
                       return execStop(fd, d1, messageID);
     if((command=="Move")  && (proxyImaging.soap_endpoint != "NOTAVAILABLE"))
                       return execMove(fd, d1, messageID);
+    if((command=="GetStatus")  && (proxyImaging.soap_endpoint != "NOTAVAILABLE"))
+                      return execGetStatus(fd, d1, messageID);
     if(command=="SystemReboot") return execSystemReboot(fd, d1, messageID);
     if(command=="GetOSDs") return execGetOSDs(fd, d1, messageID);
     if(command=="GetOSD") return execGetOSD(fd, d1, messageID);
@@ -3033,10 +3141,9 @@ int main(int argc, char **argv)
 
     if(false == sendGetOSDOptions(&proxyMedia, tmpGetOSDOptions, tmpGetOSDOptionsResponse)) {
       if(verbosity>2)std::cout <<  "sendGetOSDOptions failed all attempts" << std::endl;
-      return -12;
+      cachedOSDOptionsResponse="{\"status\":\"ERROR\", \"reason\":\"Unknown or unsupported command\"}";
     }
-
-    cachedOSDOptionsResponse=prepareOSDOptionsResponse(tmpGetOSDOptionsResponse);
+    else cachedOSDOptionsResponse=prepareOSDOptionsResponse(tmpGetOSDOptionsResponse);
 
     soap_destroy(glSoap);
     soap_end(glSoap);
@@ -3067,10 +3174,9 @@ int main(int argc, char **argv)
 
       if(false == sendGetOptions(&proxyImaging, tmpGetOptions, tmpGetOptionsResponse)) {
         if(verbosity>2)std::cout <<  "sendGetOptions failed all attempts" << std::endl;
-        return -12;
+        cachedImagingOptionsResponse="{\"status\":\"ERROR\", \"reason\":\"Unknown or unsupported command\"}";
       }
-
-      cachedImagingOptionsResponse=prepareOptionsResponse(tmpGetOptionsResponse);
+      else  cachedImagingOptionsResponse=prepareOptionsResponse(tmpGetOptionsResponse);
 
       soap_destroy(glSoap);
       soap_end(glSoap);
@@ -3089,10 +3195,9 @@ int main(int argc, char **argv)
 
       if(false == sendGetMoveOptions(&proxyImaging, tmpGetMoveOptions, tmpGetMoveOptionsResponse)) {
         if(verbosity>2)std::cout <<  "sendGetMoveOptions failed all attempts" << std::endl;
-        return -11;
+        cachedMoveOptionsResponse="{\"status\":\"ERROR\", \"reason\":\"Unknown or unsupported command\"}";
       }
-
-      cachedMoveOptionsResponse=prepareMoveOptionsResponse(tmpGetMoveOptionsResponse);
+      else cachedMoveOptionsResponse=prepareMoveOptionsResponse(tmpGetMoveOptionsResponse);
 
       soap_destroy(glSoap);
       soap_end(glSoap);
