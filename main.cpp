@@ -131,6 +131,7 @@ struct soap * glSoap;
 std::string cachedImagingOptionsResponse;
 std::string cachedMoveOptionsResponse;
 std::string cachedOSDOptionsResponse;
+std::string faultStr;
 
 //Helper functions:
 int onDataReceived(int fd, unsigned char* data, uint32_t dataLen);
@@ -307,6 +308,8 @@ std::string prepareOSDOptionsResponse(_trt__GetOSDOptionsResponse* OSDOptionsRes
 //###################### Implementation: ##################################################
 
 void printError(soap* _psoap) {
+  if(!faultStr.empty())faultStr+=", ";
+  faultStr+="ERR: " + std::string(*soap_faultstring(_psoap));
   fprintf(stderr,"error:%d faultstring:%s faultcode:%s faultsubcode:%s faultdetail:%s\n",
           _psoap->error,	*soap_faultstring(_psoap), *soap_faultcode(_psoap),*soap_faultsubcode(_psoap),
           *soap_faultdetail(_psoap));
@@ -1619,9 +1622,10 @@ void execSystemReboot(int fd, rapidjson::Document &d1, uint32_t messageID) {
   tmpSystemReboot = soap_new__tds__SystemReboot(glSoap, -1);
   tmpSystemRebootResponse = soap_new__tds__SystemRebootResponse(glSoap, -1);
 
+  faultStr="";
   if(false == sendSystemReboot(&proxyDevice, tmpSystemReboot, tmpSystemRebootResponse)) {
     if(verbosity>2)std::cout <<  "sendSystemReboot failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSystemReboot failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSystemReboot failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -1667,9 +1671,10 @@ void execGetImagingSettings(int fd, rapidjson::Document &d1, uint32_t messageID)
   GetImagingSettingsResponse = soap_new__timg__GetImagingSettingsResponse(glSoap, -1);
   GetImagingSettings->VideoSourceToken=videoSources[0];
 
+  faultStr="";
   if(false == sendGetImagingSettings(&proxyImaging, GetImagingSettings, GetImagingSettingsResponse)) {
     if(verbosity>2)std::cout <<  "sendGetImagingSettings failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetImagingSettings failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetImagingSettings failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 //Process response
@@ -1866,9 +1871,10 @@ void execGetStatus(int fd, rapidjson::Document &d1, uint32_t messageID) {
   GetStatusResponse = soap_new__timg__GetStatusResponse(glSoap, -1);
   GetStatus->VideoSourceToken=videoSources[0];
 
+  faultStr="";
   if(false == sendGetStatus(&proxyImaging, GetStatus, GetStatusResponse)) {
     if(verbosity>2)std::cout <<  "sendGetStatus failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetStatus failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetStatus failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 //Process response
@@ -1953,9 +1959,10 @@ void execSetImagingSettings(int fd, rapidjson::Document &d1, uint32_t messageID)
   GetImagingSettingsResponse = soap_new__timg__GetImagingSettingsResponse(glSoap, -1);
   GetImagingSettings->VideoSourceToken=videoSources[0];
 
+  faultStr="";
   if(false == sendGetImagingSettings(&proxyImaging, GetImagingSettings, GetImagingSettingsResponse)) {
     if(verbosity>2)std::cout <<  "sendGetImagingSettings failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetImagingSettings failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetImagingSettings failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -2136,9 +2143,10 @@ void execSetImagingSettings(int fd, rapidjson::Document &d1, uint32_t messageID)
 
 //End process response
 
+  faultStr="";
   if(false == sendSetImagingSettings(&proxyImaging, SetImagingSettings, SetImagingSettingsResponse)) {
     if(verbosity>2)std::cout <<  "sendSetImagingSettings failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSetImagingSettings failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSetImagingSettings failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -2187,9 +2195,10 @@ void execGetOSDs(int fd, rapidjson::Document &d1, uint32_t messageID) {
   GetOSDs = soap_new__trt__GetOSDs(glSoap, -1);
   GetOSDsResponse = soap_new__trt__GetOSDsResponse(glSoap, -1);
 
+  faultStr="";
   if(false == sendGetOSDs(&proxyMedia, GetOSDs, GetOSDsResponse)) {
     if(verbosity>2)std::cout <<  "sendGetOSDs failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetOSDs failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetOSDs failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 //Process response
@@ -2354,9 +2363,10 @@ void execGetOSD(int fd, rapidjson::Document &d1, uint32_t messageID) {
   GetOSDResponse = soap_new__trt__GetOSDResponse(glSoap, -1);
   GetOSD->OSDToken=OSDToken;
 
+  faultStr="";
   if(false == sendGetOSD(&proxyMedia, GetOSD, GetOSDResponse)) {
     if(verbosity>2)std::cout <<  "sendGetOSD failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetOSD failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetOSD failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 //Process response
@@ -2527,9 +2537,10 @@ void execSetOSD(int fd, rapidjson::Document &d1, uint32_t messageID) {
   GetOSDResponse = soap_new__trt__GetOSDResponse(glSoap, -1);
   GetOSD->OSDToken=OSDToken;
 
+  faultStr="";
   if(false == sendGetOSD(&proxyMedia, GetOSD, GetOSDResponse)) {
     if(verbosity>2)std::cout <<  "sendGetOSD failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetOSD failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetOSD failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -2665,9 +2676,10 @@ void execSetOSD(int fd, rapidjson::Document &d1, uint32_t messageID) {
 
 //End prepare request
 
+  faultStr="";
   if(false == sendSetOSD(&proxyMedia, SetOSD, SetOSDResponse)) {
     if(verbosity>2)std::cout <<  "sendSetOSD failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSetOSD failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSetOSD failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -2858,9 +2870,10 @@ void execCreateOSD(int fd, rapidjson::Document &d1, uint32_t messageID) {
 
 //End prepare request
 
+  faultStr="";
   if(false == sendCreateOSD(&proxyMedia, CreateOSD, CreateOSDResponse)) {
     if(verbosity>2)std::cout <<  "sendCreateOSD failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendCreateOSD failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendCreateOSD failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -2925,9 +2938,10 @@ void execDeleteOSD(int fd, rapidjson::Document &d1, uint32_t messageID) {
   DeleteOSDResponse = soap_new__trt__DeleteOSDResponse(glSoap, -1);
   DeleteOSD->OSDToken=OSDToken;
 
+  faultStr="";
   if(false == sendDeleteOSD(&proxyMedia, DeleteOSD, DeleteOSDResponse)) {
     if(verbosity>2)std::cout <<  "sendDeleteOSD failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendDeleteOSD failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendDeleteOSD failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 //Process response
@@ -3007,9 +3021,10 @@ void execStop(int fd, rapidjson::Document &d1, uint32_t messageID) {
   GetStopResponse = soap_new__timg__StopResponse(glSoap, -1);
   GetStop->VideoSourceToken=videoSources[0];
 
+  faultStr="";
   if(false == sendStop(&proxyImaging, GetStop, GetStopResponse)) {
     if(verbosity>2)std::cout <<  "sendStop failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendStop failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendStop failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -3117,9 +3132,10 @@ void execAbsoluteMove(int fd, rapidjson::Document &d1, uint32_t messageID) {
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendAbsoluteMove(&proxyPTZ, AbsoluteMove, AbsoluteMoveResponse)) {
     if(verbosity>2)std::cout <<  "sendAbsoluteMove failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendAbsoluteMove failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendAbsoluteMove failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -3212,9 +3228,10 @@ void execContinuousMove(int fd, rapidjson::Document &d1, uint32_t messageID) {
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendContinuousMove(&proxyPTZ, ContinuousMove, ContinuousMoveResponse)) {
     if(verbosity>2)std::cout <<  "sendContinuousMove failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendContinuousMove failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendContinuousMove failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -3322,9 +3339,10 @@ void execRelativeMove(int fd, rapidjson::Document &d1, uint32_t messageID) {
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendRelativeMove(&proxyPTZ, RelativeMove, RelativeMoveResponse)) {
     if(verbosity>2)std::cout <<  "sendRelativeMove failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendRelativeMove failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendRelativeMove failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -3444,9 +3462,10 @@ void execGeoMove(int fd, rapidjson::Document &d1, uint32_t messageID) {
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendGeoMove(&proxyPTZ, GeoMove, GeoMoveResponse)) {
     if(verbosity>2)std::cout <<  "sendGeoMove failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGeoMove failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGeoMove failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -3523,9 +3542,10 @@ void execPTZStop(int fd, rapidjson::Document &d1, uint32_t messageID) {
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendPTZStop(&proxyPTZ, Stop, StopResponse)) {
     if(verbosity>2)std::cout <<  "sendPTZStop failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendPTZStop failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendPTZStop failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -3596,9 +3616,10 @@ void execSendAuxiliaryCommand(int fd, rapidjson::Document &d1, uint32_t messageI
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendSendAuxiliaryCommand(&proxyPTZ, SendAuxiliaryCommand, SendAuxiliaryCommandResponse)) {
     if(verbosity>2)std::cout <<  "sendSendAuxiliaryCommand failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSendAuxiliaryCommand failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSendAuxiliaryCommand failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -3650,9 +3671,10 @@ void execGetServiceCapabilities(int fd, rapidjson::Document &d1, uint32_t messag
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendGetServiceCapabilities(&proxyPTZ, GetServiceCapabilities, GetServiceCapabilitiesResponse)) {
     if(verbosity>2)std::cout <<  "sendGetServiceCapabilities failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetServiceCapabilities failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetServiceCapabilities failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -3742,9 +3764,10 @@ void execPTZGetStatus(int fd, rapidjson::Document &d1, uint32_t messageID) {
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendPTZGetStatus(&proxyPTZ, PTZGetStatus, PTZGetStatusResponse)) {
     if(verbosity>2)std::cout <<  "sendPTZGetStatus failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendPTZGetStatus failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendPTZGetStatus failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -3853,9 +3876,10 @@ void execGetConfigurations(int fd, rapidjson::Document &d1, uint32_t messageID) 
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendGetConfigurations(&proxyPTZ, GetConfigurations, GetConfigurationsResponse)) {
     if(verbosity>2)std::cout <<  "sendGetConfigurations failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetConfigurations failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetConfigurations failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -4015,9 +4039,10 @@ void execGetConfiguration(int fd, rapidjson::Document &d1, uint32_t messageID) {
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendGetConfiguration(&proxyPTZ, GetConfiguration, GetConfigurationResponse)) {
     if(verbosity>2)std::cout <<  "sendGetConfiguration failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetConfiguration failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetConfiguration failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -4153,9 +4178,10 @@ void execGetNodes(int fd, rapidjson::Document &d1, uint32_t messageID) {
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendGetNodes(&proxyPTZ, GetNodes, GetNodesResponse)) {
     if(verbosity>2)std::cout <<  "sendGetNodes failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetNodes failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetNodes failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -4416,9 +4442,10 @@ void execGetNode(int fd, rapidjson::Document &d1, uint32_t messageID) {
   GetNode->NodeToken=std::string(d1[CMD_PARAMS]["NodeToken"].GetString());
 //End Prepare request
 
+  faultStr="";
   if(false == sendGetNode(&proxyPTZ, GetNode, GetNodeResponse)) {
     if(verbosity>2)std::cout <<  "sendGetNode failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetNode failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetNode failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -4671,9 +4698,10 @@ void execGetConfigurationOptions(int fd, rapidjson::Document &d1, uint32_t messa
   GetConfigurationOptions->ConfigurationToken=std::string(d1[CMD_PARAMS]["ConfigurationToken"].GetString());
 //End Prepare request
 
+  faultStr="";
   if(false == sendGetConfigurationOptions(&proxyPTZ, GetConfigurationOptions, GetConfigurationOptionsResponse)) {
     if(verbosity>2)std::cout <<  "sendGetConfigurationOptions failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetConfigurationOptions failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetConfigurationOptions failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -4912,10 +4940,11 @@ void execGetCompatibleConfigurations(int fd, rapidjson::Document &d1, uint32_t m
   GetCompatibleConfigurations->ProfileToken=std::string(d1[CMD_PARAMS]["ProfileToken"].GetString());
 //End Prepare request
 
+  faultStr="";
   if(false == sendGetCompatibleConfigurations(&proxyPTZ, GetCompatibleConfigurations,
       GetCompatibleConfigurationsResponse)) {
     if(verbosity>2)std::cout <<  "sendGetCompatibleConfigurations failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetCompatibleConfigurations failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetCompatibleConfigurations failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -5074,10 +5103,11 @@ void execGetPresets(int fd, rapidjson::Document &d1, uint32_t messageID) {
   GetPresets->ProfileToken=std::string(d1[CMD_PARAMS]["ProfileToken"].GetString());
 //End Prepare request
 
+  faultStr="";
   if(false == sendGetPresets(&proxyPTZ, GetPresets,
                              GetPresetsResponse)) {
     if(verbosity>2)std::cout <<  "sendGetPresets failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetPresets failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetPresets failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -5183,10 +5213,11 @@ void execRemovePreset(int fd, rapidjson::Document &d1, uint32_t messageID) {
   RemovePreset->ProfileToken=std::string(d1[CMD_PARAMS]["ProfileToken"].GetString());
 //End Prepare request
 
+  faultStr="";
   if(false == sendRemovePreset(&proxyPTZ, RemovePreset,
                                RemovePresetResponse)) {
     if(verbosity>2)std::cout <<  "sendRemovePreset failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendRemovePreset failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendRemovePreset failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -5279,10 +5310,11 @@ void execGotoPreset(int fd, rapidjson::Document &d1, uint32_t messageID) {
   }
 //End Prepare request
 
+  faultStr="";
   if(false == sendGotoPreset(&proxyPTZ, GotoPreset,
                              GotoPresetResponse)) {
     if(verbosity>2)std::cout <<  "sendGotoPreset failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGotoPreset failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGotoPreset failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -5369,10 +5401,11 @@ void execGotoHomePosition(int fd, rapidjson::Document &d1, uint32_t messageID) {
   }
 //End Prepare request
 
+  faultStr="";
   if(false == sendGotoHomePosition(&proxyPTZ, GotoHomePosition,
                                    GotoHomePositionResponse)) {
     if(verbosity>2)std::cout <<  "sendGotoHomePosition failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGotoHomePosition failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGotoHomePosition failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -5438,10 +5471,11 @@ void execSetHomePosition(int fd, rapidjson::Document &d1, uint32_t messageID) {
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendSetHomePosition(&proxyPTZ, SetHomePosition,
                                   SetHomePositionResponse)) {
     if(verbosity>2)std::cout <<  "sendSetHomePosition failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSetHomePosition failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSetHomePosition failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -5512,10 +5546,11 @@ void execRemovePresetTour(int fd, rapidjson::Document &d1, uint32_t messageID) {
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendRemovePresetTour(&proxyPTZ, RemovePresetTour,
                                    RemovePresetTourResponse)) {
     if(verbosity>2)std::cout <<  "sendRemovePresetTour failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendRemovePresetTour failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendRemovePresetTour failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -5581,10 +5616,11 @@ void execCreatePresetTour(int fd, rapidjson::Document &d1, uint32_t messageID) {
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendCreatePresetTour(&proxyPTZ, CreatePresetTour,
                                    CreatePresetTourResponse)) {
     if(verbosity>2)std::cout <<  "sendCreatePresetTour failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendCreatePresetTour failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendCreatePresetTour failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -5660,10 +5696,11 @@ void execSetPreset(int fd, rapidjson::Document &d1, uint32_t messageID) {
   }
 //End Prepare request
 
+  faultStr="";
   if(false == sendSetPreset(&proxyPTZ, SetPreset,
                             SetPresetResponse)) {
     if(verbosity>2)std::cout <<  "sendSetPreset failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSetPreset failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSetPreset failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -5750,10 +5787,11 @@ void execOperatePresetTour(int fd, rapidjson::Document &d1, uint32_t messageID) 
   }
 //End Prepare request
 
+  faultStr="";
   if(false == sendOperatePresetTour(&proxyPTZ, OperatePresetTour,
                                     OperatePresetTourResponse)) {
     if(verbosity>2)std::cout <<  "sendOperatePresetTour failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendOperatePresetTour failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendOperatePresetTour failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -5981,9 +6019,10 @@ void execSetConfiguration(int fd, rapidjson::Document &d1, uint32_t messageID) {
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendSetConfiguration(&proxyPTZ, SetConfiguration, SetConfigurationResponse)) {
     if(verbosity>2)std::cout <<  "sendSetConfiguration failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSetConfiguration failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSetConfiguration failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -6047,9 +6086,10 @@ void execGetPresetTours(int fd, rapidjson::Document &d1, uint32_t messageID) {
   GetPresetTours->ProfileToken=std::string(d1[CMD_PARAMS]["ProfileToken"].GetString());
 //End Prepare request
 
+  faultStr="";
   if(false == sendGetPresetTours(&proxyPTZ, GetPresetTours, GetPresetToursResponse)) {
     if(verbosity>2)std::cout <<  "sendGetPresetTours failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetPresetTours failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetPresetTours failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -6291,9 +6331,10 @@ void execGetPresetTour(int fd, rapidjson::Document &d1, uint32_t messageID) {
   GetPresetTour->PresetTourToken=std::string(d1[CMD_PARAMS]["PresetTourToken"].GetString());
 //End Prepare request
 
+  faultStr="";
   if(false == sendGetPresetTour(&proxyPTZ, GetPresetTour, GetPresetTourResponse)) {
     if(verbosity>2)std::cout <<  "sendGetPresetTour failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetPresetTour failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetPresetTour failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -6508,9 +6549,10 @@ void execGetProfiles(int fd, rapidjson::Document &d1, uint32_t messageID) {
 //Prepare request
 //End Prepare request
 
+  faultStr="";
   if(false == sendGetProfiles(&proxyMedia, GetProfiles, GetProfilesResponse)) {
     if(verbosity>2)std::cout <<  "sendGetProfiles failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetProfiles failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetProfiles failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -6663,9 +6705,10 @@ void execGetDeviceInformation(int fd, rapidjson::Document &d1, uint32_t messageI
 //Prepare request
 //End Prepare request
 
+  faultStr="";
   if(false == sendGetDeviceInformation(&proxyDevice, GetDeviceInformation, GetDeviceInformationResponse)) {
     if(verbosity>2)std::cout <<  "sendGetDeviceInformation failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetDeviceInformation failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetDeviceInformation failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -6742,9 +6785,10 @@ void execAddPTZConfiguration(int fd, rapidjson::Document &d1, uint32_t messageID
   AddPTZConfiguration->ConfigurationToken=std::string(d1[CMD_PARAMS]["ConfigurationToken"].GetString());
 //End Prepare request
 
+  faultStr="";
   if(false == sendAddPTZConfiguration(&proxyMedia, AddPTZConfiguration, AddPTZConfigurationResponse)) {
     if(verbosity>2)std::cout <<  "sendAddPTZConfiguration failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendAddPTZConfiguration failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendAddPTZConfiguration failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -6812,9 +6856,10 @@ void execGetPresetTourOptions(int fd, rapidjson::Document &d1, uint32_t messageI
   }
 //End Prepare request
 
+  faultStr="";
   if(false == sendGetPresetTourOptions(&proxyPTZ, GetPresetTourOptions, GetPresetTourOptionsResponse)) {
     if(verbosity>2)std::cout <<  "sendGetPresetTourOptions failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetPresetTourOptions failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetPresetTourOptions failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -7114,9 +7159,10 @@ void execModifyPresetTour(int fd, rapidjson::Document &d1, uint32_t messageID) {
 
 //End Prepare request
 
+  faultStr="";
   if(false == sendModifyPresetTour(&proxyPTZ, ModifyPresetTour, ModifyPresetTourResponse)) {
     if(verbosity>2)std::cout <<  "sendModifyPresetTour failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendModifyPresetTour failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendModifyPresetTour failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -7213,9 +7259,10 @@ void execMove(int fd, rapidjson::Document &d1, uint32_t messageID) {
   }
 //End Prepare request
 
+  faultStr="";
   if(false == sendMove(&proxyImaging, GetMove, GetMoveResponse)) {
     if(verbosity>2)std::cout <<  "sendMove failed all attempts" << std::endl;
-    outStr="{\"status\":\"ERROR\", \"reason\":\"sendMove failed all attempts\"}";
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendMove failed all attempts\", \"message\":\""+faultStr+"\"}";
     goto cleanSendResponse;
   }
 
@@ -8076,6 +8123,7 @@ int main(int argc, char **argv) {
   tmpGetCapabilities->Category.push_back(tt__CapabilityCategory__All);
   _tds__GetCapabilitiesResponse *tmpGetCapabilitiesResponse = soap_new__tds__GetCapabilitiesResponse(glSoap, -1);
 
+  faultStr="";
   if(false == sendGetCapabilities(&proxyDevice, tmpGetCapabilities, tmpGetCapabilitiesResponse,
                                   &proxyMedia, &proxyImaging, &proxyPTZ)) {
     if(verbosity>2)std::cout <<  "sendGetCapabilities failed all attempts" << std::endl;
@@ -8104,6 +8152,7 @@ int main(int argc, char **argv) {
   _trt__GetVideoSources *tmpGetVideoSources = soap_new__trt__GetVideoSources(glSoap, -1);
   _trt__GetVideoSourcesResponse* tmpGetVideoSourcesResponse = soap_new__trt__GetVideoSourcesResponse(glSoap, -1);
 
+  faultStr="";
   if(false == sendGetVideoSources(&proxyMedia, tmpGetVideoSources, tmpGetVideoSourcesResponse)) {
     if(verbosity>2)std::cout <<  "sendGetVideoSources failed all attempts" << std::endl;
     return -10;
@@ -8138,6 +8187,7 @@ int main(int argc, char **argv) {
   _trt__GetOSDOptionsResponse* tmpGetOSDOptionsResponse = soap_new__trt__GetOSDOptionsResponse(glSoap, -1);
   tmpGetOSDOptions->ConfigurationToken=videoSources[0];
 
+  faultStr="";
   if(false == sendGetOSDOptions(&proxyMedia, tmpGetOSDOptions, tmpGetOSDOptionsResponse)) {
     if(verbosity>2)std::cout <<  "sendGetOSDOptions failed all attempts" << std::endl;
     cachedOSDOptionsResponse="{\"status\":\"ERROR\", \"reason\":\"Unknown or unsupported command\"}";
@@ -8170,7 +8220,8 @@ int main(int argc, char **argv) {
     _timg__GetOptionsResponse* tmpGetOptionsResponse = soap_new__timg__GetOptionsResponse(glSoap, -1);
     tmpGetOptions->VideoSourceToken=videoSources[0];
 
-    if(false == sendGetOptions(&proxyImaging, tmpGetOptions, tmpGetOptionsResponse)) {
+    faultStr="";
+  if(false == sendGetOptions(&proxyImaging, tmpGetOptions, tmpGetOptionsResponse)) {
       if(verbosity>2)std::cout <<  "sendGetOptions failed all attempts" << std::endl;
       cachedImagingOptionsResponse="{\"status\":\"ERROR\", \"reason\":\"Unknown or unsupported command\"}";
     } else  cachedImagingOptionsResponse=prepareOptionsResponse(tmpGetOptionsResponse);
@@ -8190,7 +8241,8 @@ int main(int argc, char **argv) {
     _timg__GetMoveOptionsResponse* tmpGetMoveOptionsResponse = soap_new__timg__GetMoveOptionsResponse(glSoap, -1);
     tmpGetMoveOptions->VideoSourceToken=videoSources[0];
 
-    if(false == sendGetMoveOptions(&proxyImaging, tmpGetMoveOptions, tmpGetMoveOptionsResponse)) {
+    faultStr="";
+  if(false == sendGetMoveOptions(&proxyImaging, tmpGetMoveOptions, tmpGetMoveOptionsResponse)) {
       if(verbosity>2)std::cout <<  "sendGetMoveOptions failed all attempts" << std::endl;
       cachedMoveOptionsResponse="{\"status\":\"ERROR\", \"reason\":\"Unknown or unsupported command\"}";
     } else cachedMoveOptionsResponse=prepareMoveOptionsResponse(tmpGetMoveOptionsResponse);
