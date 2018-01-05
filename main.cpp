@@ -131,6 +131,7 @@ struct soap * glSoap;
 std::string cachedImagingOptionsResponse;
 std::string cachedMoveOptionsResponse;
 std::string cachedOSDOptionsResponse;
+std::string cachedCapabilities;
 std::string faultStr;
 
 //Helper functions:
@@ -164,6 +165,13 @@ bool sendGetVideoSources(MediaBindingProxy* tProxyMedia, _trt__GetVideoSources *
 //                     _trt__GetProfilesResponse * getProfilesResponse, soap * tSoap);
 bool sendGetProfiles(MediaBindingProxy* tProxyMedia, _trt__GetProfiles * getProfiles,
                      _trt__GetProfilesResponse * getProfilesResponse);
+bool sendSetVideoEncoderConfiguration(MediaBindingProxy* tProxyMedia,
+                     _trt__SetVideoEncoderConfiguration * SetVideoEncoderConfiguration,
+                     _trt__SetVideoEncoderConfigurationResponse * SetVideoEncoderConfigurationResponse);
+bool sendGetVideoEncoderConfiguration(MediaBindingProxy* tProxyMedia,
+                     _trt__GetVideoEncoderConfiguration * GetVideoEncoderConfiguration,
+                     _trt__GetVideoEncoderConfigurationResponse * GetVideoEncoderConfigurationResponse);
+
 bool sendAddPTZConfiguration(MediaBindingProxy* tProxyMedia, _trt__AddPTZConfiguration * AddPTZConfiguration,
                              _trt__AddPTZConfigurationResponse * AddPTZConfigurationResponse);
 bool sendGetStreamUri(MediaBindingProxy* tProxyMedia, _trt__GetStreamUri * streamUri,
@@ -253,6 +261,8 @@ bool sendGetPresetTourOptions(PTZBindingProxy* tProxyPTZ, _tptz__GetPresetTourOp
 bool sendModifyPresetTour(PTZBindingProxy* tProxyPTZ, _tptz__ModifyPresetTour * imagingSettings,
                           _tptz__ModifyPresetTourResponse * imagingSettingsResponse);
 
+//SetVideoEncoderConfiguration
+//GetProfiles add VideoEncoderConfiguration
 
 //Commands functions
 void execGetImagingSettings(int fd, rapidjson::Document &d1, uint32_t messageID);
@@ -296,10 +306,12 @@ void execSetConfiguration(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execGetPresetTours(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execGetPresetTour(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execGetProfiles(int fd, rapidjson::Document &d1, uint32_t messageID);
+void execSetVideoEncoderConfiguration(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execAddPTZConfiguration(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execGetDeviceInformation(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execGetPresetTourOptions(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execModifyPresetTour(int fd, rapidjson::Document &d1, uint32_t messageID);
+void execGetCapabilities(int fd, rapidjson::Document &d1, uint32_t messageID);
 
 std::string prepareOptionsResponse(_timg__GetOptionsResponse* optionsResponse);
 std::string prepareMoveOptionsResponse(_timg__GetMoveOptionsResponse* moveOptionsResponse);
@@ -403,6 +415,7 @@ bool sendGetCapabilities(DeviceBindingProxy* tProxyDevice, _tds__GetCapabilities
     if (getCapResponse->Capabilities->Media != NULL) {
       tProxyMedia->soap_endpoint = getCapResponse->Capabilities->Media->XAddr.c_str();
       if(verbosity>2)fprintf(stderr, "MediaUrl Found: %s\n",getCapResponse->Capabilities->Media->XAddr.c_str());
+      cachedCapabilities="{\"status\":\"OK\", \"parameters\":{\"Capabilities\":[\"Media\"";
     } else {
       if(verbosity>1)std::cout <<  "sendGetCapabilities Media not found: "  << std::endl;
       tCount = 0;
@@ -411,6 +424,7 @@ bool sendGetCapabilities(DeviceBindingProxy* tProxyDevice, _tds__GetCapabilities
     if (getCapResponse->Capabilities->Imaging != NULL) {
       tProxyImaging->soap_endpoint = getCapResponse->Capabilities->Imaging->XAddr.c_str();
       if(verbosity>2)fprintf(stderr, "ImagingUrl Found: %s\n",getCapResponse->Capabilities->Imaging->XAddr.c_str());
+      cachedCapabilities+=", \"Imaging\"";
     } else {
       if(verbosity>1)std::cout <<  "sendGetCapabilities Imaging not found: "  << std::endl;
       tProxyImaging->soap_endpoint = "NOTAVAILABLE";
@@ -418,10 +432,12 @@ bool sendGetCapabilities(DeviceBindingProxy* tProxyDevice, _tds__GetCapabilities
     if (getCapResponse->Capabilities->PTZ != NULL) {
       tProxyPTZ->soap_endpoint = getCapResponse->Capabilities->PTZ->XAddr.c_str();
       if(verbosity>2)fprintf(stderr, "PTZUrl Found: %s\n",getCapResponse->Capabilities->PTZ->XAddr.c_str());
+      cachedCapabilities+=", \"PTZ\"";
     } else {
       if(verbosity>1)std::cout <<  "sendGetCapabilities PTZ not found: "  << std::endl;
       tProxyPTZ->soap_endpoint = "NOTAVAILABLE";
     }
+    if (getCapResponse->Capabilities->Media != NULL) cachedCapabilities+="]}}";
     tCount = 0;
     return true;
   } else {
@@ -1571,6 +1587,55 @@ bool sendGetProfiles(MediaBindingProxy* tProxyMedia, _trt__GetProfiles * getProf
   }
 }
 
+bool sendSetVideoEncoderConfiguration(MediaBindingProxy* tProxyMedia, _trt__SetVideoEncoderConfiguration *
+        SetVideoEncoderConfiguration, _trt__SetVideoEncoderConfigurationResponse * SetVideoEncoderConfigurationResponse) {
+  static int tCount=0;
+  tCount++;
+  if(tCount > RETRIES) {
+    tCount = 0;
+    return false;
+  }
+  int result = tProxyMedia->SetVideoEncoderConfiguration(SetVideoEncoderConfiguration,
+                                                          *SetVideoEncoderConfigurationResponse);
+  if (result == SOAP_OK) {
+    if(verbosity>2)fprintf(stderr, "SetVideoEncoderConfigurationFound:\n");
+    tCount = 0;
+    return true;
+  } else {
+    if(verbosity>2)std::cout <<  "sendSetVideoEncoderConfiguration return result: " << result << std::endl;
+    if(verbosity>1)printError(tProxyMedia->soap);
+    tProxyMedia->soap->userid = onvifLogin.c_str();
+    tProxyMedia->soap->passwd = onvifPass.c_str();
+    return sendSetVideoEncoderConfiguration(tProxyMedia, SetVideoEncoderConfiguration,
+                                             SetVideoEncoderConfigurationResponse);
+  }
+}
+
+bool sendGetVideoEncoderConfiguration(MediaBindingProxy* tProxyMedia, _trt__GetVideoEncoderConfiguration *
+        GetVideoEncoderConfiguration, _trt__GetVideoEncoderConfigurationResponse * GetVideoEncoderConfigurationResponse) {
+  static int tCount=0;
+  tCount++;
+  if(tCount > RETRIES) {
+    tCount = 0;
+    return false;
+  }
+  int result = tProxyMedia->GetVideoEncoderConfiguration(GetVideoEncoderConfiguration,
+                                                          *GetVideoEncoderConfigurationResponse);
+  if (result == SOAP_OK) {
+    if(verbosity>2)fprintf(stderr, "GetVideoEncoderConfigurationFound:\n");
+    tCount = 0;
+    return true;
+  } else {
+    if(verbosity>2)std::cout <<  "sendGetVideoEncoderConfiguration return result: " << result << std::endl;
+    if(verbosity>1)printError(tProxyMedia->soap);
+    tProxyMedia->soap->userid = onvifLogin.c_str();
+    tProxyMedia->soap->passwd = onvifPass.c_str();
+    return sendGetVideoEncoderConfiguration(tProxyMedia, GetVideoEncoderConfiguration,
+                                             GetVideoEncoderConfigurationResponse);
+  }
+}
+
+
 bool sendGetStreamUri(MediaBindingProxy* tProxyMedia, _trt__GetStreamUri * streamUri,
                       _trt__GetStreamUriResponse * streamUriResponse) {
   static int tCount=0;
@@ -2481,17 +2546,10 @@ sendResponse:
 }
 
 void execSetOSD(int fd, rapidjson::Document &d1, uint32_t messageID) {
-  /*
-  bool sendSetOSD(MediaBindingProxy* tProxyMedia, _trt__SetOSD * imagingSettings,
-                      _trt__SetOSDResponse * imagingSettingsResponse);
-  */
   std::string outStr="{\"status\":\"OK\"}";
   std::string OSDToken="";
   std::string tmpVar;
-  /*
-  bool sendGetOSD(MediaBindingProxy* tProxyMedia, _trt__GetOSD * imagingSettings,
-                  _trt__GetOSDResponse * imagingSettingsResponse);
-  */
+
   _trt__GetOSD * GetOSD;
   _trt__GetOSDResponse * GetOSDResponse;
   _trt__SetOSD * SetOSD;
@@ -2974,6 +3032,15 @@ void execGetOSDOptions(int fd, rapidjson::Document &d1, uint32_t messageID) {
   sendData(fd, data, cachedOSDOptionsResponse.length()+sHeader);
 }
 
+void execGetCapabilities(int fd, rapidjson::Document &d1, uint32_t messageID) {
+  unsigned char data[cachedCapabilities.length()+sHeader];
+  pHeader tmpHeader= (pHeader)data;
+  tmpHeader->dataLen=cachedCapabilities.length();
+  tmpHeader->mesID=messageID;
+  tmpHeader->marker=ONVIF_PROT_MARKER;
+  memcpy(data+sHeader,(unsigned char*)cachedCapabilities.c_str(),cachedCapabilities.length());
+  sendData(fd, data, cachedCapabilities.length()+sHeader);
+}
 
 void execGetOptions(int fd, rapidjson::Document &d1, uint32_t messageID) {
   unsigned char data[cachedImagingOptionsResponse.length()+sHeader];
@@ -6650,6 +6717,59 @@ void execGetProfiles(int fd, rapidjson::Document &d1, uint32_t messageID) {
         outStr+="\"token\":\""+tmpPTZConfig->token+"\"";
         outStr+="}, ";
       }
+      if(tmpConfig->VideoEncoderConfiguration!=NULL) {
+        outStr+="\"VideoEncoderConfiguration\":{";
+        if(tmpConfig->VideoEncoderConfiguration->H264!=NULL) {
+          outStr+="\"H264\":{";
+          if(tmpConfig->VideoEncoderConfiguration->H264->H264Profile==tt__H264Profile__Baseline)
+            outStr+="\"H264Profile\":\"Baseline\", ";
+          else if(tmpConfig->VideoEncoderConfiguration->H264->H264Profile==tt__H264Profile__Main)
+            outStr+="\"H264Profile\":\"Main\", ";
+          else if(tmpConfig->VideoEncoderConfiguration->H264->H264Profile==tt__H264Profile__Extended)
+            outStr+="\"H264Profile\":\"Extended\", ";
+          else if(tmpConfig->VideoEncoderConfiguration->H264->H264Profile==tt__H264Profile__High)
+            outStr+="\"H264Profile\":\"High\", ";
+          outStr+="\"GovLength\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->H264->GovLength)+"\"";
+          outStr+="}, ";
+        }
+        if(tmpConfig->VideoEncoderConfiguration->RateControl!=NULL) {
+          outStr+="\"RateControl\":{";
+          outStr+="\"BitrateLimit\":\""+
+                std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->BitrateLimit)+"\", ";
+          outStr+="\"EncodingInterval\":\""+
+                std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->EncodingInterval)+"\", ";
+          outStr+="\"FrameRateLimit\":\""+
+                std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->FrameRateLimit)+"\"";
+          outStr+="}, ";
+        }
+        if(tmpConfig->VideoEncoderConfiguration->Resolution!=NULL) {
+          outStr+="\"Resolution\":{";
+          outStr+="\"Height\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->Resolution->Height)+"\", ";
+          outStr+="\"Width\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->Resolution->Width)+"\"";
+          outStr+="}, ";
+        }
+        if(tmpConfig->VideoEncoderConfiguration->MPEG4!=NULL) {
+          outStr+="\"MPEG4\":{";
+          if(tmpConfig->VideoEncoderConfiguration->MPEG4->Mpeg4Profile==tt__Mpeg4Profile__SP)
+            outStr+="\"Mpeg4Profile\":\"SP\", ";
+          else if(tmpConfig->VideoEncoderConfiguration->MPEG4->Mpeg4Profile==tt__Mpeg4Profile__ASP)
+            outStr+="\"Mpeg4Profile\":\"ASP\", ";
+          outStr+="\"GovLength\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->MPEG4->GovLength)+"\"";
+          outStr+="}, ";
+        }
+        if(tmpConfig->VideoEncoderConfiguration->Encoding==tt__VideoEncoding__H264)
+          outStr+="\"Encoding\":\"H264\", ";
+        else if(tmpConfig->VideoEncoderConfiguration->Encoding==tt__VideoEncoding__MPEG4)
+          outStr+="\"Encoding\":\"MPEG4\", ";
+        else if(tmpConfig->VideoEncoderConfiguration->Encoding==tt__VideoEncoding__JPEG)
+          outStr+="\"Encoding\":\"JPEG\", ";
+        outStr+="\"UseCount\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->UseCount)+"\", ";
+        outStr+="\"SessionTimeout\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->SessionTimeout)+"\", ";
+        outStr+="\"Quality\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->Quality)+"\", ";
+        outStr+="\"Name\":\""+tmpConfig->VideoEncoderConfiguration->Name+"\", ";
+        outStr+="\"token\":\""+tmpConfig->VideoEncoderConfiguration->token+"\"";
+        outStr+="}, ";
+      }
       outStr+="\"Name\":\""+tmpConfig->Name+"\", ";
       outStr+="\"token\":\""+tmpConfig->token+"\"";
       outStr+="}";
@@ -6675,6 +6795,180 @@ sendResponse:
   sendData(fd, data, outStr.length()+sHeader);
 }
 
+void execSetVideoEncoderConfiguration(int fd, rapidjson::Document &d1, uint32_t messageID) {
+  std::string outStr="{\"status\":\"OK\"}";
+  std::string tmpVar;
+  std::string encToken="";
+
+  _trt__SetVideoEncoderConfiguration * SetVideoEncoderConfiguration;
+  _trt__SetVideoEncoderConfigurationResponse * SetVideoEncoderConfigurationResponse;
+
+  _trt__GetVideoEncoderConfiguration * GetVideoEncoderConfiguration;
+  _trt__GetVideoEncoderConfigurationResponse * GetVideoEncoderConfigurationResponse;
+
+  tt__VideoEncoderConfiguration* tmpConfig;
+
+  if (d1.HasMember(CMD_PARAMS)) {
+    if(!d1[CMD_PARAMS].HasMember("Configuration")) {
+      std::cout << "Failed to process request, No Configuration found" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"No Configuration found\"}";
+      goto sendResponse;
+    }
+    if(!d1[CMD_PARAMS]["Configuration"].HasMember("token")) {
+      std::cout << "Failed to process request, No Configuration:token found" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"No Configuration:token found\"}";
+      goto sendResponse;
+    }
+  } else {
+    std::cout << "Failed to process request, No parameters found" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"No parameters found\"}";
+    goto sendResponse;
+  }
+
+  if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyMedia.soap, NULL, onvifLogin.c_str(), onvifPass.c_str())) {
+    std::cout << "Failed to assign user:password" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to assign user:password\"}";
+    goto sendResponse;
+  }
+
+  if (SOAP_OK != soap_wsse_add_Timestamp(proxyMedia.soap, "Time", 10)) {
+    std::cout << "Failed to set a timestamp" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to set a timestamp\"}";
+    goto sendResponse;
+  }
+
+  proxyMedia.soap->recv_timeout=ONVIF_WAIT_TIMEOUT;
+  proxyMedia.soap->send_timeout=ONVIF_WAIT_TIMEOUT;
+  proxyMedia.soap->connect_timeout=ONVIF_WAIT_TIMEOUT;
+
+  encToken=std::string(d1[CMD_PARAMS]["Configuration"]["token"].GetString());
+
+  GetVideoEncoderConfiguration = soap_new__trt__GetVideoEncoderConfiguration(glSoap, -1);
+  GetVideoEncoderConfigurationResponse = soap_new__trt__GetVideoEncoderConfigurationResponse(glSoap, -1);
+  GetVideoEncoderConfiguration->ConfigurationToken=encToken;
+
+  faultStr="";
+  if(false == sendGetVideoEncoderConfiguration(&proxyMedia, GetVideoEncoderConfiguration,
+                                                GetVideoEncoderConfigurationResponse)) {
+    if(verbosity>2)std::cout <<  "sendGetVideoEncoderConfiguration failed all attempts" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetVideoEncoderConfiguration failed all attempts\", \"message\":\""
+      +faultStr+"\"}";
+    goto cleanSendResponse;
+  }
+
+
+  SetVideoEncoderConfiguration = soap_new__trt__SetVideoEncoderConfiguration(glSoap, -1);
+  SetVideoEncoderConfigurationResponse = soap_new__trt__SetVideoEncoderConfigurationResponse(glSoap, -1);
+
+
+  SetVideoEncoderConfiguration->Configuration=GetVideoEncoderConfigurationResponse->Configuration;
+
+//Prepare request
+  tmpConfig=SetVideoEncoderConfiguration->Configuration;
+  if(d1[CMD_PARAMS]["Configuration"].HasMember("Encoding")) {
+    tmpVar=std::string(d1[CMD_PARAMS]["Configuration"]["Encoding"].GetString());
+    if(tmpVar=="H264") tmpConfig->Encoding=tt__VideoEncoding__H264;
+    else if(tmpVar=="MPEG4") tmpConfig->Encoding=tt__VideoEncoding__MPEG4;
+    else if(tmpVar=="JPEG") tmpConfig->Encoding=tt__VideoEncoding__JPEG;
+  }
+  if(d1[CMD_PARAMS]["Configuration"].HasMember("UseCount")) {
+    tmpVar=std::string(d1[CMD_PARAMS]["Configuration"]["UseCount"].GetString());
+    tmpConfig->UseCount=std::stoi(tmpVar);
+  }
+  if(d1[CMD_PARAMS]["Configuration"].HasMember("SessionTimeout")) {
+    tmpVar=std::string(d1[CMD_PARAMS]["Configuration"]["SessionTimeout"].GetString());
+    tmpConfig->SessionTimeout=std::stoll(tmpVar);
+  }
+  if(d1[CMD_PARAMS]["Configuration"].HasMember("Quality")) {
+    tmpVar=std::string(d1[CMD_PARAMS]["Configuration"]["Quality"].GetString());
+    tmpConfig->Quality=std::stof(tmpVar);
+  }
+  if(d1[CMD_PARAMS]["Configuration"].HasMember("Name")) {
+    tmpConfig->Name=std::string(d1[CMD_PARAMS]["Configuration"]["Name"].GetString());
+  }
+  if(d1[CMD_PARAMS]["Configuration"].HasMember("Resolution")) {
+    if(d1[CMD_PARAMS]["Configuration"]["Resolution"].HasMember("Height")) {
+      tmpVar=std::string(d1[CMD_PARAMS]["Configuration"]["Resolution"]["Height"].GetString());
+      tmpConfig->Resolution->Height=std::stoi(tmpVar);
+    }
+    if(d1[CMD_PARAMS]["Configuration"]["Resolution"].HasMember("Width")) {
+      tmpVar=std::string(d1[CMD_PARAMS]["Configuration"]["Resolution"]["Width"].GetString());
+      tmpConfig->Resolution->Width=std::stoi(tmpVar);
+    }
+  }
+  if(d1[CMD_PARAMS]["Configuration"].HasMember("RateControl")) {
+    if(tmpConfig->RateControl==NULL) tmpConfig->RateControl=soap_new_tt__VideoRateControl(glSoap,-1);
+    if(d1[CMD_PARAMS]["Configuration"]["RateControl"].HasMember("BitrateLimit")) {
+      tmpVar=std::string(d1[CMD_PARAMS]["Configuration"]["RateControl"]["BitrateLimit"].GetString());
+      tmpConfig->RateControl->BitrateLimit=std::stoi(tmpVar);
+    }
+    if(d1[CMD_PARAMS]["Configuration"]["RateControl"].HasMember("EncodingInterval")) {
+      tmpVar=std::string(d1[CMD_PARAMS]["Configuration"]["RateControl"]["EncodingInterval"].GetString());
+      tmpConfig->RateControl->EncodingInterval=std::stoi(tmpVar);
+    }
+    if(d1[CMD_PARAMS]["Configuration"]["RateControl"].HasMember("FrameRateLimit")) {
+      tmpVar=std::string(d1[CMD_PARAMS]["Configuration"]["RateControl"]["FrameRateLimit"].GetString());
+      tmpConfig->RateControl->FrameRateLimit=std::stoi(tmpVar);
+    }
+  }
+  if(d1[CMD_PARAMS]["Configuration"].HasMember("H264")) {
+    if(tmpConfig->H264==NULL) tmpConfig->H264=soap_new_tt__H264Configuration(glSoap,-1);
+    if(d1[CMD_PARAMS]["Configuration"]["H264"].HasMember("H264Profile")) {
+      tmpVar=std::string(d1[CMD_PARAMS]["Configuration"]["H264"]["H264Profile"].GetString());
+      if(tmpVar=="Baseline") tmpConfig->H264->H264Profile=tt__H264Profile__Baseline;
+      else if(tmpVar=="Main") tmpConfig->H264->H264Profile=tt__H264Profile__Main;
+      else if(tmpVar=="Extended") tmpConfig->H264->H264Profile=tt__H264Profile__Extended;
+      else if(tmpVar=="High") tmpConfig->H264->H264Profile=tt__H264Profile__High;
+    }
+    if(d1[CMD_PARAMS]["Configuration"]["H264"].HasMember("GovLength")) {
+      tmpVar=std::string(d1[CMD_PARAMS]["Configuration"]["H264"]["GovLength"].GetString());
+      tmpConfig->H264->GovLength=std::stoi(tmpVar);
+    }
+  }
+  if(d1[CMD_PARAMS]["Configuration"].HasMember("MPEG4")) {
+    if(tmpConfig->MPEG4==NULL) tmpConfig->MPEG4=soap_new_tt__Mpeg4Configuration(glSoap,-1);
+    if(d1[CMD_PARAMS]["Configuration"]["MPEG4"].HasMember("Mpeg4Profile")) {
+      tmpVar=std::string(d1[CMD_PARAMS]["Configuration"]["MPEG4"]["Mpeg4Profile"].GetString());
+      if(tmpVar=="SP") tmpConfig->MPEG4->Mpeg4Profile=tt__Mpeg4Profile__SP;
+      else if(tmpVar=="ASP") tmpConfig->MPEG4->Mpeg4Profile=tt__Mpeg4Profile__ASP;
+    }
+    if(d1[CMD_PARAMS]["Configuration"]["MPEG4"].HasMember("GovLength")) {
+      tmpVar=std::string(d1[CMD_PARAMS]["Configuration"]["MPEG4"]["GovLength"].GetString());
+      tmpConfig->MPEG4->GovLength=std::stoi(tmpVar);
+    }
+  }
+  if(d1[CMD_PARAMS].HasMember("ForcePersistence")) {
+    tmpVar=std::string(d1[CMD_PARAMS]["ForcePersistence"].GetString());
+    if(tmpVar=="true") SetVideoEncoderConfiguration->ForcePersistence=true;
+    else SetVideoEncoderConfiguration->ForcePersistence=false;
+  }
+  else SetVideoEncoderConfiguration->ForcePersistence=false;
+//End prepare request
+
+  faultStr="";
+  if(false == sendSetVideoEncoderConfiguration(&proxyMedia, SetVideoEncoderConfiguration,
+                                                SetVideoEncoderConfigurationResponse)) {
+    if(verbosity>2)std::cout <<  "sendSetVideoEncoderConfiguration failed all attempts" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSetVideoEncoderConfiguration failed all attempts\", \"message\":\""
+      +faultStr+"\"}";
+    goto cleanSendResponse;
+  }
+
+
+cleanSendResponse:
+
+  soap_destroy(glSoap);
+  soap_end(glSoap);
+
+sendResponse:
+  unsigned char data[outStr.length()+sHeader];
+  pHeader tmpHeader= (pHeader)data;
+  tmpHeader->dataLen=outStr.length();
+  tmpHeader->mesID=messageID;
+  tmpHeader->marker=ONVIF_PROT_MARKER;
+  memcpy(data+sHeader,(unsigned char*)outStr.c_str(),outStr.length());
+  sendData(fd, data, outStr.length()+sHeader);
+}
 
 void execGetDeviceInformation(int fd, rapidjson::Document &d1, uint32_t messageID) {
   std::string outStr;
@@ -7427,7 +7721,7 @@ std::string prepareOptionsResponse(_timg__GetOptionsResponse* optionsResponse) {
       outStr+="\"YbGain\":{";
       outStr+="\"Min\":\""+ std::to_string(optionsResponse->ImagingOptions->WhiteBalance->YbGain->Min)+"\", ";
       outStr+="\"Max\":\""+ std::to_string(optionsResponse->ImagingOptions->WhiteBalance->YbGain->Max)+"\"";
-      outStr+="}";
+      outStr+="}, ";
     }
     if(optionsResponse->ImagingOptions->WhiteBalance->YrGain !=NULL) {
       outStr+="\"YrGain\":{";
@@ -7869,7 +8163,9 @@ void processReceivedData(int fd, std::string message, uint32_t messageID) {
   if(command=="SetOSD") return execSetOSD(fd, d1, messageID);
   if(command=="GetOSDOptions") return execGetOSDOptions(fd, d1, messageID);
   if(command=="GetProfiles") return execGetProfiles(fd, d1, messageID);
+  if(command=="SetVideoEncoderConfiguration") return execSetVideoEncoderConfiguration(fd, d1, messageID);
   if(command=="AddPTZConfiguration") return execAddPTZConfiguration(fd, d1, messageID);
+  if(command=="GetCapabilities") return execGetCapabilities(fd, d1, messageID);
 
   if((command=="AbsoluteMove")  && (proxyPTZ.soap_endpoint != "NOTAVAILABLE"))
     return execAbsoluteMove(fd, d1, messageID);
@@ -7927,7 +8223,6 @@ void processReceivedData(int fd, std::string message, uint32_t messageID) {
     return execGetPresetTourOptions(fd, d1, messageID);
   if((command=="ModifyPresetTour")  && (proxyPTZ.soap_endpoint != "NOTAVAILABLE"))
     return execModifyPresetTour(fd, d1, messageID);
-
 
   //return error
 sendResponse:
