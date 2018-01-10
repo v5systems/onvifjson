@@ -2775,6 +2775,11 @@ void execCreateOSD(int fd, rapidjson::Document &d1, uint32_t messageID) {
       outStr="{\"status\":\"ERROR\", \"reason\":\"No OSD found\"}";
       goto sendResponse;
     }
+    if(!d1[CMD_PARAMS]["OSD"].HasMember("VideoSourceConfigurationToken")) {
+      std::cout << "Failed to process request, No OSD:VideoSourceConfigurationToken found" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"No OSD:VideoSourceConfigurationToken found\"}";
+      goto sendResponse;
+    }
   } else {
     std::cout << "Failed to process request, No parameters found" << std::endl;
     outStr="{\"status\":\"ERROR\", \"reason\":\"No parameters found\"}";
@@ -2912,8 +2917,6 @@ void execCreateOSD(int fd, rapidjson::Document &d1, uint32_t messageID) {
   if(d1[CMD_PARAMS]["OSD"].HasMember("VideoSourceConfigurationToken")) {
     tmpOSD->VideoSourceConfigurationToken->__item=
       std::string(d1[CMD_PARAMS]["OSD"]["VideoSourceConfigurationToken"].GetString());
-  } else {
-    tmpOSD->VideoSourceConfigurationToken->__item=videoSources[0];
   }
   if(d1[CMD_PARAMS]["OSD"].HasMember("Type")) {
     tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["Type"].GetString());
@@ -6768,6 +6771,11 @@ void execGetProfiles(int fd, rapidjson::Document &d1, uint32_t messageID) {
         outStr+="\"Quality\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->Quality)+"\", ";
         outStr+="\"Name\":\""+tmpConfig->VideoEncoderConfiguration->Name+"\", ";
         outStr+="\"token\":\""+tmpConfig->VideoEncoderConfiguration->token+"\"";
+        outStr+="}, ";
+      }
+      if(tmpConfig->VideoSourceConfiguration!=NULL){
+        outStr+="\"VideoSourceConfiguration\":{";
+        outStr+="\"token\":\""+tmpConfig->VideoSourceConfiguration->token+"\"";
         outStr+="}, ";
       }
       outStr+="\"Name\":\""+tmpConfig->Name+"\", ";
