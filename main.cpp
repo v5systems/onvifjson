@@ -159,6 +159,10 @@ bool sendSystemReboot(DeviceBindingProxy* tProxyDevice, _tds__SystemReboot * sys
                       _tds__SystemRebootResponse * sysRebootResponse);
 bool sendGetDeviceInformation(DeviceBindingProxy* tProxyDevice, _tds__GetDeviceInformation * GetDeviceInformation,
                               _tds__GetDeviceInformationResponse * GetDeviceInformationResponse);
+bool sendGetSystemDateAndTime(DeviceBindingProxy* tProxyDevice, _tds__GetSystemDateAndTime * GetSystemDateAndTime,
+                              _tds__GetSystemDateAndTimeResponse * GetSystemDateAndTimeResponse);
+bool sendSetSystemDateAndTime(DeviceBindingProxy* tProxyDevice, _tds__SetSystemDateAndTime * SetSystemDateAndTime,
+                              _tds__SetSystemDateAndTimeResponse * SetSystemDateAndTimeResponse);
 bool sendGetVideoSources(MediaBindingProxy* tProxyMedia, _trt__GetVideoSources * imagingSettings,
                          _trt__GetVideoSourcesResponse * imagingSettingsResponse);
 //bool sendGetProfiles(MediaBindingProxy* tProxyMedia, _trt__GetProfiles * getProfiles,
@@ -309,6 +313,8 @@ void execGetProfiles(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execSetVideoEncoderConfiguration(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execAddPTZConfiguration(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execGetDeviceInformation(int fd, rapidjson::Document &d1, uint32_t messageID);
+void execGetSystemDateAndTime(int fd, rapidjson::Document &d1, uint32_t messageID);
+void execSetSystemDateAndTime(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execGetPresetTourOptions(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execModifyPresetTour(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execGetCapabilities(int fd, rapidjson::Document &d1, uint32_t messageID);
@@ -400,6 +406,59 @@ bool sendGetDeviceInformation(DeviceBindingProxy* tProxyDevice, _tds__GetDeviceI
     return sendGetDeviceInformation(tProxyDevice, GetDeviceInformation, GetDeviceInformationResponse);
   }
 }
+
+bool sendGetSystemDateAndTime(DeviceBindingProxy* tProxyDevice, _tds__GetSystemDateAndTime * GetSystemDateAndTime,
+                              _tds__GetSystemDateAndTimeResponse * GetSystemDateAndTimeResponse) {
+  static int tCount=0;
+  tCount++;
+  if(tCount > RETRIES) {
+    tCount = 0;
+    return false;
+  }
+  int result = tProxyDevice->GetSystemDateAndTime(GetSystemDateAndTime, *GetSystemDateAndTimeResponse);
+  if (result == SOAP_OK) {
+    if(verbosity>2) {
+      fprintf(stderr, "GetSystemDateAndTime: OK\n");
+    }
+    tCount = 0;
+    return true;
+  } else {
+    if(verbosity>2)std::cout <<  "GetSystemDateAndTime return result: " << result << std::endl;
+    if(verbosity>1)printError(tProxyDevice->soap);
+    tProxyDevice->soap->userid = onvifLogin.c_str();
+    tProxyDevice->soap->passwd = onvifPass.c_str();
+    return sendGetSystemDateAndTime(tProxyDevice, GetSystemDateAndTime, GetSystemDateAndTimeResponse);
+  }
+}
+
+
+bool sendSetSystemDateAndTime(DeviceBindingProxy* tProxyDevice, _tds__SetSystemDateAndTime * SetSystemDateAndTime,
+                              _tds__SetSystemDateAndTimeResponse * SetSystemDateAndTimeResponse) {
+  static int tCount=0;
+  tCount++;
+  if(tCount > RETRIES) {
+    tCount = 0;
+    return false;
+  }
+  int result = tProxyDevice->SetSystemDateAndTime(SetSystemDateAndTime, *SetSystemDateAndTimeResponse);
+  if (result == SOAP_OK) {
+    if(verbosity>2) {
+      fprintf(stderr, "SetSystemDateAndTime: OK\n");
+    }
+    tCount = 0;
+    return true;
+  } else {
+    if(verbosity>2)std::cout <<  "SetSystemDateAndTime return result: " << result << std::endl;
+    if(verbosity>1)printError(tProxyDevice->soap);
+    tProxyDevice->soap->userid = onvifLogin.c_str();
+    tProxyDevice->soap->passwd = onvifPass.c_str();
+    return sendSetSystemDateAndTime(tProxyDevice, SetSystemDateAndTime, SetSystemDateAndTimeResponse);
+  }
+}
+
+
+
+
 
 bool sendGetCapabilities(DeviceBindingProxy* tProxyDevice, _tds__GetCapabilities * getCap,
                          _tds__GetCapabilitiesResponse * getCapResponse, MediaBindingProxy * tProxyMedia,
@@ -7039,6 +7098,283 @@ sendResponse:
   sendData(fd, data, outStr.length()+sHeader);
 }
 
+void execGetSystemDateAndTime(int fd, rapidjson::Document &d1, uint32_t messageID) {
+  std::string outStr;
+  std::string tmpVar;
+
+  _tds__GetSystemDateAndTime * GetSystemDateAndTime;
+  _tds__GetSystemDateAndTimeResponse * GetSystemDateAndTimeResponse;
+
+
+  if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyDevice.soap, NULL, onvifLogin.c_str(), onvifPass.c_str())) {
+    std::cout << "Failed to assign user:password" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to assign user:password\"}";
+    goto sendResponse;
+  }
+
+  if (SOAP_OK != soap_wsse_add_Timestamp(proxyDevice.soap, "Time", 10)) {
+    std::cout << "Failed to set a timestamp" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to set a timestamp\"}";
+    goto sendResponse;
+  }
+
+  proxyDevice.soap->recv_timeout=ONVIF_WAIT_TIMEOUT;
+  proxyDevice.soap->send_timeout=ONVIF_WAIT_TIMEOUT;
+  proxyDevice.soap->connect_timeout=ONVIF_WAIT_TIMEOUT;
+
+  GetSystemDateAndTime = soap_new__tds__GetSystemDateAndTime(glSoap, -1);
+  GetSystemDateAndTimeResponse = soap_new__tds__GetSystemDateAndTimeResponse(glSoap, -1);
+//Prepare request
+//End Prepare request
+
+  faultStr="";
+  if(false == sendGetSystemDateAndTime(&proxyDevice, GetSystemDateAndTime, GetSystemDateAndTimeResponse)) {
+    if(verbosity>2)std::cout <<  "sendGetSystemDateAndTime failed all attempts" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetSystemDateAndTime failed all attempts\", \"message\":\""+faultStr+"\"}";
+    goto cleanSendResponse;
+  }
+
+//Process response
+  outStr="{\"status\":\"OK\", \"parameters\":{\"SystemDateAndTime\":{";
+  if(GetSystemDateAndTimeResponse->SystemDateAndTime->TimeZone!=NULL){
+    outStr+="\"TimeZone\":\""+GetSystemDateAndTimeResponse->SystemDateAndTime->TimeZone->TZ+"\", ";
+  }
+  if(GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime!=NULL){
+    outStr+="\"UTCDateTime\":{";
+    outStr+="\"Date\":{";
+    outStr+="\"Year\":\""+
+        std::to_string(GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Date->Year)+"\", ";
+    outStr+="\"Month\":\""+
+        std::to_string(GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Date->Month)+"\", ";
+    outStr+="\"Day\":\""+
+        std::to_string(GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Date->Day)+"\"";
+    outStr+="}, ";
+    outStr+="\"Time\":{";
+    outStr+="\"Hour\":\""+
+        std::to_string(GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Time->Hour)+"\", ";
+    outStr+="\"Minute\":\""+
+        std::to_string(GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Time->Minute)+"\", ";
+    outStr+="\"Second\":\""+
+        std::to_string(GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Time->Second)+"\"";
+    outStr+="}}, ";
+  }
+  if(GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime!=NULL){
+    outStr+="\"LocalDateTime\":{";
+    outStr+="\"Date\":{";
+    outStr+="\"Year\":\""+
+        std::to_string(GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Date->Year)+"\", ";
+    outStr+="\"Month\":\""+
+        std::to_string(GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Date->Month)+"\", ";
+    outStr+="\"Day\":\""+
+        std::to_string(GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Date->Day)+"\"";
+    outStr+="}, ";
+    outStr+="\"Time\":{";
+    outStr+="\"Hour\":\""+
+        std::to_string(GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Time->Hour)+"\", ";
+    outStr+="\"Minute\":\""+
+        std::to_string(GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Time->Minute)+"\", ";
+    outStr+="\"Second\":\""+
+        std::to_string(GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Time->Second)+"\"";
+    outStr+="}}, ";
+  }
+  if(GetSystemDateAndTimeResponse->SystemDateAndTime->DaylightSavings)
+    outStr+="\"DaylightSavings\":\"true\", ";
+  else outStr+="\"DaylightSavings\":\"false\", ";
+
+  if(GetSystemDateAndTimeResponse->SystemDateAndTime->DateTimeType==tt__SetDateTimeType__Manual)
+    outStr+="\"DateTimeType\":\"Manual\", ";
+  else outStr+="\"DateTimeType\":\"NTP\"";
+  outStr+="}}}";
+//End process response
+
+cleanSendResponse:
+
+  soap_destroy(glSoap);
+  soap_end(glSoap);
+
+sendResponse:
+  unsigned char data[outStr.length()+sHeader];
+  pHeader tmpHeader= (pHeader)data;
+  tmpHeader->dataLen=outStr.length();
+  tmpHeader->mesID=messageID;
+  tmpHeader->marker=ONVIF_PROT_MARKER;
+  memcpy(data+sHeader,(unsigned char*)outStr.c_str(),outStr.length());
+  sendData(fd, data, outStr.length()+sHeader);
+}
+
+void execSetSystemDateAndTime(int fd, rapidjson::Document &d1, uint32_t messageID) {
+  std::string outStr="{\"status\":\"OK\"}";
+  std::string tmpVar;
+
+  _tds__SetSystemDateAndTime * SetSystemDateAndTime;
+  _tds__SetSystemDateAndTimeResponse * SetSystemDateAndTimeResponse;
+
+  _tds__GetSystemDateAndTime * GetSystemDateAndTime;
+  _tds__GetSystemDateAndTimeResponse * GetSystemDateAndTimeResponse;
+
+
+  if (d1.HasMember(CMD_PARAMS)) {
+  }
+  else {
+    std::cout << "Failed to process request, No parameters found" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"No parameters found\"}";
+    goto sendResponse;
+  }
+
+  if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyDevice.soap, NULL, onvifLogin.c_str(), onvifPass.c_str())) {
+    std::cout << "Failed to assign user:password" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to assign user:password\"}";
+    goto sendResponse;
+  }
+
+  if (SOAP_OK != soap_wsse_add_Timestamp(proxyDevice.soap, "Time", 10)) {
+    std::cout << "Failed to set a timestamp" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to set a timestamp\"}";
+    goto sendResponse;
+  }
+
+  proxyDevice.soap->recv_timeout=ONVIF_WAIT_TIMEOUT;
+  proxyDevice.soap->send_timeout=ONVIF_WAIT_TIMEOUT;
+  proxyDevice.soap->connect_timeout=ONVIF_WAIT_TIMEOUT;
+
+  GetSystemDateAndTime = soap_new__tds__GetSystemDateAndTime(glSoap, -1);
+  GetSystemDateAndTimeResponse = soap_new__tds__GetSystemDateAndTimeResponse(glSoap, -1);
+
+  faultStr="";
+  if(false == sendGetSystemDateAndTime(&proxyDevice, GetSystemDateAndTime,
+                                                GetSystemDateAndTimeResponse)) {
+    if(verbosity>2)std::cout <<  "sendGetSystemDateAndTime failed all attempts" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetSystemDateAndTime failed all attempts\", \"message\":\""
+      +faultStr+"\"}";
+    goto cleanSendResponse;
+  }
+
+
+  SetSystemDateAndTime = soap_new__tds__SetSystemDateAndTime(glSoap, -1);
+  SetSystemDateAndTimeResponse = soap_new__tds__SetSystemDateAndTimeResponse(glSoap, -1);
+
+
+  SetSystemDateAndTime->DaylightSavings=GetSystemDateAndTimeResponse->SystemDateAndTime->DaylightSavings;
+  SetSystemDateAndTime->DateTimeType=GetSystemDateAndTimeResponse->SystemDateAndTime->DateTimeType;
+  SetSystemDateAndTime->TimeZone=GetSystemDateAndTimeResponse->SystemDateAndTime->TimeZone;
+  SetSystemDateAndTime->UTCDateTime=GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime;
+
+//Prepare request
+  if(d1[CMD_PARAMS].HasMember("DateTimeType")) {
+    tmpVar=std::string(d1[CMD_PARAMS]["DateTimeType"].GetString());
+    if(tmpVar=="Manual") SetSystemDateAndTime->DateTimeType=tt__SetDateTimeType__Manual;
+    else SetSystemDateAndTime->DateTimeType=tt__SetDateTimeType__NTP;
+  }
+  if(d1[CMD_PARAMS].HasMember("DaylightSavings")) {
+    tmpVar=std::string(d1[CMD_PARAMS]["DaylightSavings"].GetString());
+    if(tmpVar=="true") SetSystemDateAndTime->DaylightSavings=true;
+    else SetSystemDateAndTime->DaylightSavings=false;
+  }
+  if(d1[CMD_PARAMS].HasMember("TimeZone")) {
+    tmpVar=std::string(d1[CMD_PARAMS]["TimeZone"].GetString());
+    if(SetSystemDateAndTime->TimeZone==NULL) SetSystemDateAndTime->TimeZone=soap_new_tt__TimeZone(glSoap,-1);
+    SetSystemDateAndTime->TimeZone->TZ=tmpVar;
+  }
+  if(d1[CMD_PARAMS].HasMember("UTCDateTime")) {
+    if(SetSystemDateAndTime->UTCDateTime==NULL) SetSystemDateAndTime->UTCDateTime=soap_new_tt__DateTime(glSoap,-1);
+    if(SetSystemDateAndTime->UTCDateTime->Date==NULL) SetSystemDateAndTime->UTCDateTime->Date=soap_new_tt__Date(glSoap,-1);
+    if(SetSystemDateAndTime->UTCDateTime->Time==NULL) SetSystemDateAndTime->UTCDateTime->Time=soap_new_tt__Time(glSoap,-1);
+    if(d1[CMD_PARAMS]["UTCDateTime"].HasMember("Date")) {
+      if(d1[CMD_PARAMS]["UTCDateTime"]["Date"].HasMember("Year")) {
+        tmpVar=std::string(d1[CMD_PARAMS]["UTCDateTime"]["Date"]["Year"].GetString());
+        SetSystemDateAndTime->UTCDateTime->Date->Year=std::stoi(tmpVar);
+      }
+      else{
+        std::cout << "Failed to process request, No UTCDateTime:Date:Year found" << std::endl;
+        outStr="{\"status\":\"ERROR\", \"reason\":\"No UTCDateTime:Date:Year found\"}";
+        goto sendResponse;
+      }
+      if(d1[CMD_PARAMS]["UTCDateTime"]["Date"].HasMember("Month")) {
+        tmpVar=std::string(d1[CMD_PARAMS]["UTCDateTime"]["Date"]["Month"].GetString());
+        SetSystemDateAndTime->UTCDateTime->Date->Month=std::stoi(tmpVar);
+      }
+      else{
+        std::cout << "Failed to process request, No UTCDateTime:Date:Month found" << std::endl;
+        outStr="{\"status\":\"ERROR\", \"reason\":\"No UTCDateTime:Date:Month found\"}";
+        goto sendResponse;
+      }
+      if(d1[CMD_PARAMS]["UTCDateTime"]["Date"].HasMember("Day")) {
+        tmpVar=std::string(d1[CMD_PARAMS]["UTCDateTime"]["Date"]["Day"].GetString());
+        SetSystemDateAndTime->UTCDateTime->Date->Day=std::stoi(tmpVar);
+      }
+      else{
+        std::cout << "Failed to process request, No UTCDateTime:Date:Day found" << std::endl;
+        outStr="{\"status\":\"ERROR\", \"reason\":\"No UTCDateTime:Date:Day found\"}";
+        goto sendResponse;
+      }
+    }
+    else{
+      std::cout << "Failed to process request, No UTCDateTime:Date found" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"No UTCDateTime:Date found\"}";
+      goto sendResponse;
+    }
+    if(d1[CMD_PARAMS]["UTCDateTime"].HasMember("Time")) {
+      if(d1[CMD_PARAMS]["UTCDateTime"]["Time"].HasMember("Hour")) {
+        tmpVar=std::string(d1[CMD_PARAMS]["UTCDateTime"]["Time"]["Hour"].GetString());
+        SetSystemDateAndTime->UTCDateTime->Time->Hour=std::stoi(tmpVar);
+      }
+      else{
+        std::cout << "Failed to process request, No UTCDateTime:Time:Hour found" << std::endl;
+        outStr="{\"status\":\"ERROR\", \"reason\":\"No UTCDateTime:Time:Hour found\"}";
+        goto sendResponse;
+      }
+      if(d1[CMD_PARAMS]["UTCDateTime"]["Time"].HasMember("Minute")) {
+        tmpVar=std::string(d1[CMD_PARAMS]["UTCDateTime"]["Time"]["Minute"].GetString());
+        SetSystemDateAndTime->UTCDateTime->Time->Minute=std::stoi(tmpVar);
+      }
+      else{
+        std::cout << "Failed to process request, No UTCDateTime:Time:Minute found" << std::endl;
+        outStr="{\"status\":\"ERROR\", \"reason\":\"No UTCDateTime:Time:Minute found\"}";
+        goto sendResponse;
+      }
+      if(d1[CMD_PARAMS]["UTCDateTime"]["Time"].HasMember("Second")) {
+        tmpVar=std::string(d1[CMD_PARAMS]["UTCDateTime"]["Time"]["Second"].GetString());
+        SetSystemDateAndTime->UTCDateTime->Time->Second=std::stoi(tmpVar);
+      }
+      else{
+        std::cout << "Failed to process request, No UTCDateTime:Time:Second found" << std::endl;
+        outStr="{\"status\":\"ERROR\", \"reason\":\"No UTCDateTime:Time:Second found\"}";
+        goto sendResponse;
+      }
+    }
+    else{
+      std::cout << "Failed to process request, No UTCDateTime:Time found" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"No UTCDateTime:Time found\"}";
+      goto sendResponse;
+    }
+  }
+
+//End prepare request
+
+  faultStr="";
+  if(false == sendSetSystemDateAndTime(&proxyDevice, SetSystemDateAndTime,
+                                                SetSystemDateAndTimeResponse)) {
+    if(verbosity>2)std::cout <<  "sendSetSystemDateAndTime failed all attempts" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendSetSystemDateAndTime failed all attempts\", \"message\":\""
+      +faultStr+"\"}";
+    goto cleanSendResponse;
+  }
+
+
+cleanSendResponse:
+
+  soap_destroy(glSoap);
+  soap_end(glSoap);
+
+sendResponse:
+  unsigned char data[outStr.length()+sHeader];
+  pHeader tmpHeader= (pHeader)data;
+  tmpHeader->dataLen=outStr.length();
+  tmpHeader->mesID=messageID;
+  tmpHeader->marker=ONVIF_PROT_MARKER;
+  memcpy(data+sHeader,(unsigned char*)outStr.c_str(),outStr.length());
+  sendData(fd, data, outStr.length()+sHeader);
+}
 
 void execAddPTZConfiguration(int fd, rapidjson::Document &d1, uint32_t messageID) {
   std::string outStr="{\"status\":\"OK\"}";
@@ -8163,6 +8499,8 @@ void processReceivedData(int fd, std::string message, uint32_t messageID) {
   if((command=="GetStatus")  && (proxyImaging.soap_endpoint != "NOTAVAILABLE"))
     return execGetStatus(fd, d1, messageID);
   if(command=="SystemReboot") return execSystemReboot(fd, d1, messageID);
+  if(command=="GetSystemDateAndTime") return execGetSystemDateAndTime(fd, d1, messageID);
+  if(command=="SetSystemDateAndTime") return execSetSystemDateAndTime(fd, d1, messageID);
   if(command=="GetDeviceInformation") return execGetDeviceInformation(fd, d1, messageID);
   if(command=="GetOSDs") return execGetOSDs(fd, d1, messageID);
   if(command=="GetOSD") return execGetOSD(fd, d1, messageID);
