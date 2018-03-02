@@ -318,6 +318,7 @@ void execSetSystemDateAndTime(int fd, rapidjson::Document &d1, uint32_t messageI
 void execGetPresetTourOptions(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execModifyPresetTour(int fd, rapidjson::Document &d1, uint32_t messageID);
 void execGetCapabilities(int fd, rapidjson::Document &d1, uint32_t messageID);
+void execGenerateRecoverVideoConfig(int fd, rapidjson::Document &d1, uint32_t messageID);
 
 std::string prepareOptionsResponse(_timg__GetOptionsResponse* optionsResponse);
 std::string prepareMoveOptionsResponse(_timg__GetMoveOptionsResponse* moveOptionsResponse);
@@ -7895,6 +7896,9 @@ void execMove(int fd, rapidjson::Document &d1, uint32_t messageID) {
       GetMove->Focus->Continuous->Speed=std::stof(tmpVar);
     }
   }
+
+
+
 //End Prepare request
 
   faultStr="";
@@ -7918,6 +7922,307 @@ sendResponse:
   memcpy(data+sHeader,(unsigned char*)outStr.c_str(),outStr.length());
   sendData(fd, data, outStr.length()+sHeader);
 
+}
+
+void execGenerateRecoverVideoConfig(int fd, rapidjson::Document &d1, uint32_t messageID) {
+  std::string outStr;
+  std::string tmpVar;
+  std::string onvifcliPath;
+  std::string destinationScriptPath;
+  ofstream recoverScript;
+
+  _trt__GetProfiles * GetProfiles;
+  _trt__GetProfilesResponse * GetProfilesResponse;
+
+  if (d1.HasMember(CMD_PARAMS)) {
+    if(!d1[CMD_PARAMS].HasMember("onvifcliPath")) {
+      std::cout << "Failed to process request, No onvifcliPath found" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"No onvifcliPath found\"}";
+      goto sendResponse;
+    }
+    else onvifcliPath=std::string(d1[CMD_PARAMS]["onvifcliPath"].GetString());
+    if(!d1[CMD_PARAMS].HasMember("destinationScriptPath")) {
+      std::cout << "Failed to process request, No destinationScriptPath found" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"No destinationScriptPath found\"}";
+      goto sendResponse;
+    }
+    else destinationScriptPath=std::string(d1[CMD_PARAMS]["destinationScriptPath"].GetString());
+  } else {
+    std::cout << "Failed to process request, No parameters found" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"No parameters found\"}";
+    goto sendResponse;
+  }
+
+
+  if (SOAP_OK != soap_wsse_add_UsernameTokenDigest(proxyMedia.soap, NULL, onvifLogin.c_str(), onvifPass.c_str())) {
+    std::cout << "Failed to assign user:password" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to assign user:password\"}";
+    goto sendResponse;
+  }
+
+  if (SOAP_OK != soap_wsse_add_Timestamp(proxyMedia.soap, "Time", 10)) {
+    std::cout << "Failed to set a timestamp" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"Failed to set a timestamp\"}";
+    goto sendResponse;
+  }
+
+  proxyMedia.soap->recv_timeout=ONVIF_WAIT_TIMEOUT;
+  proxyMedia.soap->send_timeout=ONVIF_WAIT_TIMEOUT;
+  proxyMedia.soap->connect_timeout=ONVIF_WAIT_TIMEOUT;
+
+  GetProfiles = soap_new__trt__GetProfiles(glSoap, -1);
+  GetProfilesResponse = soap_new__trt__GetProfilesResponse(glSoap, -1);
+//Prepare request
+//End Prepare request
+
+  faultStr="";
+  if(false == sendGetProfiles(&proxyMedia, GetProfiles, GetProfilesResponse)) {
+    if(verbosity>2)std::cout <<  "sendGetProfiles failed all attempts" << std::endl;
+    outStr="{\"status\":\"ERROR\", \"reason\":\"sendGetProfiles failed all attempts\", \"message\":\""+faultStr+"\"}";
+    goto cleanSendResponse;
+  }
+
+  recoverScript.open (destinationScriptPath.c_str());
+//Process response
+  outStr="{\"status\":\"OK\", \"parameters\":{";
+  if(verbosity>3) std::cout << "Number of Profiles received is "
+                              << GetProfilesResponse->Profiles.size() << std::endl;
+  if(GetProfilesResponse->Profiles.size()>0) {
+    outStr+="\"Profiles\":[";
+    for (unsigned i=0; i<GetProfilesResponse->Profiles.size(); i++) {
+      if(i>0)outStr+=", ";
+      outStr+="{";
+      tt__Profile* tmpConfig=GetProfilesResponse->Profiles[i];
+      if(tmpConfig->PTZConfiguration!=NULL) {
+        tt__PTZConfiguration* tmpPTZConfig=tmpConfig->PTZConfiguration;
+        outStr+="\"PTZConfiguration\":{";
+        if(tmpPTZConfig->DefaultPTZSpeed!=NULL) {
+          outStr+="\"DefaultPTZSpeed\":{";
+          if(tmpPTZConfig->DefaultPTZSpeed->PanTilt!=NULL) {
+            outStr+="\"PanTilt\":{";
+            outStr+="\"x\":\""+std::to_string(tmpPTZConfig->DefaultPTZSpeed->PanTilt->x)+"\", ";
+            outStr+="\"y\":\""+std::to_string(tmpPTZConfig->DefaultPTZSpeed->PanTilt->y)+"\"";
+            outStr+="}, ";
+          }
+          if(tmpPTZConfig->DefaultPTZSpeed->Zoom!=NULL)
+            outStr+="\"Zoom\":{\"x\":\""+std::to_string(tmpPTZConfig->DefaultPTZSpeed->Zoom->x)+"\"}";
+          if(outStr.at(outStr.length()-1)==' ') outStr.erase (outStr.length()-2, 2);
+          outStr+="}, ";
+        }
+        if(tmpPTZConfig->PanTiltLimits!=NULL) {
+          outStr+="\"PanTiltLimits\":{";
+          if(tmpPTZConfig->PanTiltLimits->Range!=NULL) {
+            outStr+="\"Range\":{";
+            if(tmpPTZConfig->PanTiltLimits->Range->XRange!=NULL) {
+              outStr+="\"XRange\":{";
+              outStr+="\"Min\":\""+std::to_string(tmpPTZConfig->PanTiltLimits->Range->XRange->Min)+"\", ";
+              outStr+="\"Max\":\""+std::to_string(tmpPTZConfig->PanTiltLimits->Range->XRange->Max)+"\"";
+              outStr+="}, ";
+            }
+            if(tmpPTZConfig->PanTiltLimits->Range->YRange!=NULL) {
+              outStr+="\"YRange\":{";
+              outStr+="\"Min\":\""+std::to_string(tmpPTZConfig->PanTiltLimits->Range->YRange->Min)+"\", ";
+              outStr+="\"Max\":\""+std::to_string(tmpPTZConfig->PanTiltLimits->Range->YRange->Max)+"\"";
+              outStr+="}, ";
+            }
+            outStr+="\"URI\":\"" + tmpPTZConfig->PanTiltLimits->Range->URI +"\"";
+            outStr+="}";
+          }
+          outStr+="}, ";
+        }
+        if(tmpPTZConfig->ZoomLimits!=NULL) {
+          outStr+="\"ZoomLimits\":{";
+          if(tmpPTZConfig->ZoomLimits->Range!=NULL) {
+            outStr+="\"Range\":{";
+            if(tmpPTZConfig->ZoomLimits->Range->XRange!=NULL) {
+              outStr+="\"XRange\":{";
+              outStr+="\"Min\":\""+std::to_string(tmpPTZConfig->ZoomLimits->Range->XRange->Min)+"\", ";
+              outStr+="\"Max\":\""+std::to_string(tmpPTZConfig->ZoomLimits->Range->XRange->Max)+"\"";
+              outStr+="}, ";
+            }
+            outStr+="\"URI\":\"" + tmpPTZConfig->ZoomLimits->Range->URI +"\"";
+            outStr+="}";
+          }
+          outStr+="}, ";
+        }
+        if(tmpPTZConfig->DefaultAbsolutePantTiltPositionSpace!=NULL)
+          outStr+="\"DefaultAbsolutePantTiltPositionSpace\":\""+
+                  (*(tmpPTZConfig->DefaultAbsolutePantTiltPositionSpace))+"\", ";
+        if(tmpPTZConfig->DefaultAbsoluteZoomPositionSpace!=NULL)
+          outStr+="\"DefaultAbsoluteZoomPositionSpace\":\""+
+                  (*(tmpPTZConfig->DefaultAbsoluteZoomPositionSpace))+"\", ";
+        if(tmpPTZConfig->DefaultContinuousPanTiltVelocitySpace!=NULL)
+          outStr+="\"DefaultContinuousPanTiltVelocitySpace\":\""+
+                  (*(tmpPTZConfig->DefaultContinuousPanTiltVelocitySpace))+"\", ";
+        if(tmpPTZConfig->DefaultContinuousZoomVelocitySpace!=NULL)
+          outStr+="\"DefaultContinuousZoomVelocitySpace\":\""+
+                  (*(tmpPTZConfig->DefaultContinuousZoomVelocitySpace))+"\", ";
+        if(tmpPTZConfig->DefaultRelativePanTiltTranslationSpace!=NULL)
+          outStr+="\"DefaultRelativePanTiltTranslationSpace\":\""+
+                  (*(tmpPTZConfig->DefaultRelativePanTiltTranslationSpace))+"\", ";
+        if(tmpPTZConfig->DefaultRelativeZoomTranslationSpace!=NULL)
+          outStr+="\"DefaultRelativeZoomTranslationSpace\":\""+
+                  (*(tmpPTZConfig->DefaultRelativeZoomTranslationSpace))+"\", ";
+        if(tmpPTZConfig->DefaultPTZTimeout!=NULL)
+          outStr+="\"DefaultPTZTimeout\":\""+std::to_string(*(tmpPTZConfig->DefaultPTZTimeout))+"\", ";
+        if(tmpPTZConfig->PresetTourRamp!=NULL)
+          outStr+="\"PresetTourRamp\":\""+std::to_string(*(tmpPTZConfig->PresetTourRamp))+"\", ";
+        if(tmpPTZConfig->PresetRamp!=NULL)
+          outStr+="\"PresetRamp\":\""+std::to_string(*(tmpPTZConfig->PresetRamp))+"\", ";
+        if(tmpPTZConfig->MoveRamp!=NULL)
+          outStr+="\"MoveRamp\":\""+std::to_string(*(tmpPTZConfig->MoveRamp))+"\", ";
+        outStr+="\"UseCount\":\""+std::to_string(tmpPTZConfig->UseCount)+"\", ";
+        outStr+="\"Name\":\""+tmpPTZConfig->Name+"\", ";
+        outStr+="\"NodeToken\":\""+tmpPTZConfig->NodeToken+"\", ";
+        outStr+="\"token\":\""+tmpPTZConfig->token+"\"";
+        outStr+="}, ";
+      }
+      if(tmpConfig->VideoEncoderConfiguration!=NULL) {
+        recoverScript << "\n" << onvifcliPath << " " << listenIP << " " << listenPort << " \'";
+        recoverScript << "{\"command\":\"SetVideoEncoderConfiguration\", \"parameters\":{\"ForcePersistence\":\"true\", ";
+        recoverScript << "\"Configuration\":{";
+        outStr+="\"VideoEncoderConfiguration\":{";
+        if(tmpConfig->VideoEncoderConfiguration->H264!=NULL) {
+          outStr+="\"H264\":{";
+          recoverScript << "\"H264\":{";
+          if(tmpConfig->VideoEncoderConfiguration->H264->H264Profile==tt__H264Profile__Baseline){
+            outStr+="\"H264Profile\":\"Baseline\", ";
+            recoverScript << "\"H264Profile\":\"Baseline\", ";
+          }
+
+          else if(tmpConfig->VideoEncoderConfiguration->H264->H264Profile==tt__H264Profile__Main){
+            outStr+="\"H264Profile\":\"Main\", ";
+            recoverScript << "\"H264Profile\":\"Main\", ";
+          }
+
+          else if(tmpConfig->VideoEncoderConfiguration->H264->H264Profile==tt__H264Profile__Extended){
+            outStr+="\"H264Profile\":\"Extended\", ";
+            recoverScript << "\"H264Profile\":\"Extended\", ";
+          }
+
+          else if(tmpConfig->VideoEncoderConfiguration->H264->H264Profile==tt__H264Profile__High){
+            outStr+="\"H264Profile\":\"High\", ";
+            recoverScript << "\"H264Profile\":\"High\", ";
+          }
+
+          outStr+="\"GovLength\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->H264->GovLength)+"\"";
+          outStr+="}, ";
+          recoverScript << "\"GovLength\":\""<<std::to_string(tmpConfig->VideoEncoderConfiguration->H264->GovLength);
+          recoverScript << "\"}, ";
+        }
+        if(tmpConfig->VideoEncoderConfiguration->RateControl!=NULL) {
+          outStr+="\"RateControl\":{";
+          recoverScript << "\"RateControl\":{";
+          outStr+="\"BitrateLimit\":\""+
+                std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->BitrateLimit)+"\", ";
+          recoverScript << "\"BitrateLimit\":\"";
+          recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->BitrateLimit);
+          recoverScript << "\", ";
+          outStr+="\"EncodingInterval\":\""+
+                std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->EncodingInterval)+"\", ";
+          recoverScript << "\"EncodingInterval\":\"";
+          recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->EncodingInterval);
+          recoverScript << "\", ";
+          outStr+="\"FrameRateLimit\":\""+
+                std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->FrameRateLimit)+"\"";
+          outStr+="}, ";
+          recoverScript << "\"FrameRateLimit\":\"";
+          recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->FrameRateLimit);
+          recoverScript << "\"}, ";
+        }
+        if(tmpConfig->VideoEncoderConfiguration->Resolution!=NULL) {
+          outStr+="\"Resolution\":{";
+          recoverScript << "\"Resolution\":{";
+          outStr+="\"Height\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->Resolution->Height)+"\", ";
+          recoverScript << "\"Height\":\"";
+          recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->Resolution->Height);
+          recoverScript << "\", ";
+          outStr+="\"Width\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->Resolution->Width)+"\"";
+          recoverScript << "\"Width\":\"";
+          recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->Resolution->Width);
+          recoverScript << "\"}, ";
+          outStr+="}, ";
+        }
+        if(tmpConfig->VideoEncoderConfiguration->MPEG4!=NULL) {
+          outStr+="\"MPEG4\":{";
+          recoverScript << "\"MPEG4\":{";
+          if(tmpConfig->VideoEncoderConfiguration->MPEG4->Mpeg4Profile==tt__Mpeg4Profile__SP){
+            outStr+="\"Mpeg4Profile\":\"SP\", ";
+            recoverScript << "\"Mpeg4Profile\":\"SP\", ";
+          }
+          else if(tmpConfig->VideoEncoderConfiguration->MPEG4->Mpeg4Profile==tt__Mpeg4Profile__ASP){
+            outStr+="\"Mpeg4Profile\":\"ASP\", ";
+            recoverScript << "\"Mpeg4Profile\":\"ASP\", ";
+          }
+          outStr+="\"GovLength\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->MPEG4->GovLength)+"\"";
+          recoverScript << "\"GovLength\":\"";
+          recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->MPEG4->GovLength);
+          recoverScript << "\"}, ";
+          outStr+="}, ";
+        }
+        if(tmpConfig->VideoEncoderConfiguration->Encoding==tt__VideoEncoding__H264){
+          outStr+="\"Encoding\":\"H264\", ";
+          recoverScript << "\"Encoding\":\"H264\", ";
+        }
+        else if(tmpConfig->VideoEncoderConfiguration->Encoding==tt__VideoEncoding__MPEG4){
+          outStr+="\"Encoding\":\"MPEG4\", ";
+          recoverScript << "\"Encoding\":\"MPEG4\", ";
+        }
+        else if(tmpConfig->VideoEncoderConfiguration->Encoding==tt__VideoEncoding__JPEG){
+          outStr+="\"Encoding\":\"JPEG\", ";
+          recoverScript << "\"Encoding\":\"JPEG\", ";
+        }
+        outStr+="\"UseCount\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->UseCount)+"\", ";
+        recoverScript << "\"UseCount\":\"";
+        recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->UseCount);
+        recoverScript << "\", ";
+        outStr+="\"SessionTimeout\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->SessionTimeout)+"\", ";
+        recoverScript << "\"SessionTimeout\":\"";
+        recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->SessionTimeout);
+        recoverScript << "\", ";
+        outStr+="\"Quality\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->Quality)+"\", ";
+        recoverScript << "\"Quality\":\"";
+        recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->Quality);
+        recoverScript << "\", ";
+        outStr+="\"Name\":\""+tmpConfig->VideoEncoderConfiguration->Name+"\", ";
+        recoverScript << "\"Name\":\"";
+        recoverScript << tmpConfig->VideoEncoderConfiguration->Name;
+        recoverScript << "\", ";
+        outStr+="\"token\":\""+tmpConfig->VideoEncoderConfiguration->token+"\"";
+        recoverScript << "\"token\":\"";
+        recoverScript << tmpConfig->VideoEncoderConfiguration->token;
+        recoverScript << "\"}}}\'\n";
+        outStr+="}, ";
+      }
+      if(tmpConfig->VideoSourceConfiguration!=NULL){
+        outStr+="\"VideoSourceConfiguration\":{";
+        outStr+="\"token\":\""+tmpConfig->VideoSourceConfiguration->token+"\"";
+        outStr+="}, ";
+      }
+      outStr+="\"Name\":\""+tmpConfig->Name+"\", ";
+      outStr+="\"token\":\""+tmpConfig->token+"\"";
+      outStr+="}";
+    }
+    if(outStr.at(outStr.length()-1)==' ') outStr.erase (outStr.length()-2, 2);
+    outStr+="]";
+  }
+  outStr+="}}";
+//End process response
+  recoverScript.close();
+
+cleanSendResponse:
+
+  soap_destroy(glSoap);
+  soap_end(glSoap);
+
+sendResponse:
+  unsigned char data[outStr.length()+sHeader];
+  pHeader tmpHeader= (pHeader)data;
+  tmpHeader->dataLen=outStr.length();
+  tmpHeader->mesID=messageID;
+  tmpHeader->marker=ONVIF_PROT_MARKER;
+  memcpy(data+sHeader,(unsigned char*)outStr.c_str(),outStr.length());
+  sendData(fd, data, outStr.length()+sHeader);
 }
 
 ////////////////////////////Prepare calls:
@@ -8509,6 +8814,7 @@ void processReceivedData(int fd, std::string message, uint32_t messageID) {
   if(command=="SetOSD") return execSetOSD(fd, d1, messageID);
   if(command=="GetOSDOptions") return execGetOSDOptions(fd, d1, messageID);
   if(command=="GetProfiles") return execGetProfiles(fd, d1, messageID);
+  if(command=="GenerateRecoverVideoConfig") return execGenerateRecoverVideoConfig(fd, d1, messageID);
   if(command=="SetVideoEncoderConfiguration") return execSetVideoEncoderConfiguration(fd, d1, messageID);
   if(command=="AddPTZConfiguration") return execAddPTZConfiguration(fd, d1, messageID);
   if(command=="GetCapabilities") return execGetCapabilities(fd, d1, messageID);

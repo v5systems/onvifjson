@@ -1,5 +1,5 @@
 #!/bin/bash
 
-gcc test.cpp -o test
+gcc test.cpp -o onvifjsoncli
 make
 
