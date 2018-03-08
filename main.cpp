@@ -2899,7 +2899,7 @@ void execCreateOSD(int fd, rapidjson::Document &d1, uint32_t messageID) {
     }
     if(d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("TimeFormat")) {
       timeFormat=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["TimeFormat"].GetString());
-      tmpOSD->TextString->TimeFormat=&dateFormat;
+      tmpOSD->TextString->TimeFormat=&timeFormat;
     }
     if(d1[CMD_PARAMS]["OSD"]["TextString"].HasMember("FontSize")) {
       tmpVar=std::string(d1[CMD_PARAMS]["OSD"]["TextString"]["FontSize"].GetString());
