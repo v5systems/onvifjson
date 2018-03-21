@@ -7930,6 +7930,9 @@ void execGenerateRecoverVideoConfig(int fd, rapidjson::Document &d1, uint32_t me
   std::string onvifcliPath;
   std::string destinationScriptPath;
   ofstream recoverScript;
+  std::stringstream recoverOut;
+  std::string recoverToken;
+  std::map <std::string, bool> configTokens;
 
   _trt__GetProfiles * GetProfiles;
   _trt__GetProfilesResponse * GetProfilesResponse;
@@ -8078,121 +8081,128 @@ void execGenerateRecoverVideoConfig(int fd, rapidjson::Document &d1, uint32_t me
         outStr+="}, ";
       }
       if(tmpConfig->VideoEncoderConfiguration!=NULL) {
-        recoverScript << "\n" << onvifcliPath << " " << listenIP << " " << listenPort << " \'";
-        recoverScript << "{\"command\":\"SetVideoEncoderConfiguration\", \"parameters\":{\"ForcePersistence\":\"true\", ";
-        recoverScript << "\"Configuration\":{";
+        recoverOut.str("");
+        recoverOut << "\n" << onvifcliPath << " " << listenIP << " " << listenPort << " \'";
+        recoverOut << "{\"command\":\"SetVideoEncoderConfiguration\", \"parameters\":{\"ForcePersistence\":\"true\", ";
+        recoverOut << "\"Configuration\":{";
         outStr+="\"VideoEncoderConfiguration\":{";
         if(tmpConfig->VideoEncoderConfiguration->H264!=NULL) {
           outStr+="\"H264\":{";
-          recoverScript << "\"H264\":{";
+          recoverOut << "\"H264\":{";
           if(tmpConfig->VideoEncoderConfiguration->H264->H264Profile==tt__H264Profile__Baseline){
             outStr+="\"H264Profile\":\"Baseline\", ";
-            recoverScript << "\"H264Profile\":\"Baseline\", ";
+            recoverOut << "\"H264Profile\":\"Baseline\", ";
           }
 
           else if(tmpConfig->VideoEncoderConfiguration->H264->H264Profile==tt__H264Profile__Main){
             outStr+="\"H264Profile\":\"Main\", ";
-            recoverScript << "\"H264Profile\":\"Main\", ";
+            recoverOut << "\"H264Profile\":\"Main\", ";
           }
 
           else if(tmpConfig->VideoEncoderConfiguration->H264->H264Profile==tt__H264Profile__Extended){
             outStr+="\"H264Profile\":\"Extended\", ";
-            recoverScript << "\"H264Profile\":\"Extended\", ";
+            recoverOut << "\"H264Profile\":\"Extended\", ";
           }
 
           else if(tmpConfig->VideoEncoderConfiguration->H264->H264Profile==tt__H264Profile__High){
             outStr+="\"H264Profile\":\"High\", ";
-            recoverScript << "\"H264Profile\":\"High\", ";
+            recoverOut << "\"H264Profile\":\"High\", ";
           }
 
           outStr+="\"GovLength\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->H264->GovLength)+"\"";
           outStr+="}, ";
-          recoverScript << "\"GovLength\":\""<<std::to_string(tmpConfig->VideoEncoderConfiguration->H264->GovLength);
-          recoverScript << "\"}, ";
+          recoverOut << "\"GovLength\":\""<<std::to_string(tmpConfig->VideoEncoderConfiguration->H264->GovLength);
+          recoverOut << "\"}, ";
         }
         if(tmpConfig->VideoEncoderConfiguration->RateControl!=NULL) {
           outStr+="\"RateControl\":{";
-          recoverScript << "\"RateControl\":{";
+          recoverOut << "\"RateControl\":{";
           outStr+="\"BitrateLimit\":\""+
                 std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->BitrateLimit)+"\", ";
-          recoverScript << "\"BitrateLimit\":\"";
-          recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->BitrateLimit);
-          recoverScript << "\", ";
+          recoverOut << "\"BitrateLimit\":\"";
+          recoverOut << std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->BitrateLimit);
+          recoverOut << "\", ";
           outStr+="\"EncodingInterval\":\""+
                 std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->EncodingInterval)+"\", ";
-          recoverScript << "\"EncodingInterval\":\"";
-          recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->EncodingInterval);
-          recoverScript << "\", ";
+          recoverOut << "\"EncodingInterval\":\"";
+          recoverOut << std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->EncodingInterval);
+          recoverOut << "\", ";
           outStr+="\"FrameRateLimit\":\""+
                 std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->FrameRateLimit)+"\"";
           outStr+="}, ";
-          recoverScript << "\"FrameRateLimit\":\"";
-          recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->FrameRateLimit);
-          recoverScript << "\"}, ";
+          recoverOut << "\"FrameRateLimit\":\"";
+          recoverOut << std::to_string(tmpConfig->VideoEncoderConfiguration->RateControl->FrameRateLimit);
+          recoverOut << "\"}, ";
         }
         if(tmpConfig->VideoEncoderConfiguration->Resolution!=NULL) {
           outStr+="\"Resolution\":{";
-          recoverScript << "\"Resolution\":{";
+          recoverOut << "\"Resolution\":{";
           outStr+="\"Height\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->Resolution->Height)+"\", ";
-          recoverScript << "\"Height\":\"";
-          recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->Resolution->Height);
-          recoverScript << "\", ";
+          recoverOut << "\"Height\":\"";
+          recoverOut << std::to_string(tmpConfig->VideoEncoderConfiguration->Resolution->Height);
+          recoverOut << "\", ";
           outStr+="\"Width\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->Resolution->Width)+"\"";
-          recoverScript << "\"Width\":\"";
-          recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->Resolution->Width);
-          recoverScript << "\"}, ";
+          recoverOut << "\"Width\":\"";
+          recoverOut << std::to_string(tmpConfig->VideoEncoderConfiguration->Resolution->Width);
+          recoverOut << "\"}, ";
           outStr+="}, ";
         }
         if(tmpConfig->VideoEncoderConfiguration->MPEG4!=NULL) {
           outStr+="\"MPEG4\":{";
-          recoverScript << "\"MPEG4\":{";
+          recoverOut << "\"MPEG4\":{";
           if(tmpConfig->VideoEncoderConfiguration->MPEG4->Mpeg4Profile==tt__Mpeg4Profile__SP){
             outStr+="\"Mpeg4Profile\":\"SP\", ";
-            recoverScript << "\"Mpeg4Profile\":\"SP\", ";
+            recoverOut << "\"Mpeg4Profile\":\"SP\", ";
           }
           else if(tmpConfig->VideoEncoderConfiguration->MPEG4->Mpeg4Profile==tt__Mpeg4Profile__ASP){
             outStr+="\"Mpeg4Profile\":\"ASP\", ";
-            recoverScript << "\"Mpeg4Profile\":\"ASP\", ";
+            recoverOut << "\"Mpeg4Profile\":\"ASP\", ";
           }
           outStr+="\"GovLength\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->MPEG4->GovLength)+"\"";
-          recoverScript << "\"GovLength\":\"";
-          recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->MPEG4->GovLength);
-          recoverScript << "\"}, ";
+          recoverOut << "\"GovLength\":\"";
+          recoverOut << std::to_string(tmpConfig->VideoEncoderConfiguration->MPEG4->GovLength);
+          recoverOut << "\"}, ";
           outStr+="}, ";
         }
         if(tmpConfig->VideoEncoderConfiguration->Encoding==tt__VideoEncoding__H264){
           outStr+="\"Encoding\":\"H264\", ";
-          recoverScript << "\"Encoding\":\"H264\", ";
+          recoverOut << "\"Encoding\":\"H264\", ";
         }
         else if(tmpConfig->VideoEncoderConfiguration->Encoding==tt__VideoEncoding__MPEG4){
           outStr+="\"Encoding\":\"MPEG4\", ";
-          recoverScript << "\"Encoding\":\"MPEG4\", ";
+          recoverOut << "\"Encoding\":\"MPEG4\", ";
         }
         else if(tmpConfig->VideoEncoderConfiguration->Encoding==tt__VideoEncoding__JPEG){
           outStr+="\"Encoding\":\"JPEG\", ";
-          recoverScript << "\"Encoding\":\"JPEG\", ";
+          recoverOut << "\"Encoding\":\"JPEG\", ";
         }
         outStr+="\"UseCount\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->UseCount)+"\", ";
-        recoverScript << "\"UseCount\":\"";
-        recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->UseCount);
-        recoverScript << "\", ";
+        recoverOut << "\"UseCount\":\"";
+        recoverOut << std::to_string(tmpConfig->VideoEncoderConfiguration->UseCount);
+        recoverOut << "\", ";
         outStr+="\"SessionTimeout\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->SessionTimeout)+"\", ";
-        recoverScript << "\"SessionTimeout\":\"";
-        recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->SessionTimeout);
-        recoverScript << "\", ";
+        recoverOut << "\"SessionTimeout\":\"";
+        recoverOut << std::to_string(tmpConfig->VideoEncoderConfiguration->SessionTimeout);
+        recoverOut << "\", ";
         outStr+="\"Quality\":\""+std::to_string(tmpConfig->VideoEncoderConfiguration->Quality)+"\", ";
-        recoverScript << "\"Quality\":\"";
-        recoverScript << std::to_string(tmpConfig->VideoEncoderConfiguration->Quality);
-        recoverScript << "\", ";
+        recoverOut << "\"Quality\":\"";
+        recoverOut << std::to_string(tmpConfig->VideoEncoderConfiguration->Quality);
+        recoverOut << "\", ";
         outStr+="\"Name\":\""+tmpConfig->VideoEncoderConfiguration->Name+"\", ";
-        recoverScript << "\"Name\":\"";
-        recoverScript << tmpConfig->VideoEncoderConfiguration->Name;
-        recoverScript << "\", ";
+        recoverOut << "\"Name\":\"";
+        recoverOut << tmpConfig->VideoEncoderConfiguration->Name;
+        recoverOut << "\", ";
         outStr+="\"token\":\""+tmpConfig->VideoEncoderConfiguration->token+"\"";
-        recoverScript << "\"token\":\"";
-        recoverScript << tmpConfig->VideoEncoderConfiguration->token;
-        recoverScript << "\"}}}\'\n";
+        recoverOut << "\"token\":\"";
+        recoverOut << tmpConfig->VideoEncoderConfiguration->token;
+        recoverToken=tmpConfig->VideoEncoderConfiguration->token;
+        recoverOut << "\"}}}\'\n";
         outStr+="}, ";
+        std::map <std::string, bool>::iterator it = configTokens.find(recoverToken);
+        if(it != configTokens.end()){
+          recoverScript << recoverOut.str();
+        }
+        else configTokens[recoverToken]=true;
       }
       if(tmpConfig->VideoSourceConfiguration!=NULL){
         outStr+="\"VideoSourceConfiguration\":{";
@@ -8208,6 +8218,10 @@ void execGenerateRecoverVideoConfig(int fd, rapidjson::Document &d1, uint32_t me
   }
   outStr+="}}";
 //End process response
+  recoverScript.close();
+  destinationScriptPath=destinationScriptPath+".json";
+  recoverScript.open (destinationScriptPath.c_str());
+  recoverScript << outStr;
   recoverScript.close();
 
 cleanSendResponse:
