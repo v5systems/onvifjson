@@ -8199,7 +8199,7 @@ void execGenerateRecoverVideoConfig(int fd, rapidjson::Document &d1, uint32_t me
         recoverOut << "\"}}}\'\n";
         outStr+="}, ";
         std::map <std::string, bool>::iterator it = configTokens.find(recoverToken);
-        if(it != configTokens.end()){
+        if(it == configTokens.end()){
           recoverScript << recoverOut.str();
         }
         else configTokens[recoverToken]=true;
