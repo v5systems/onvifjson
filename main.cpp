@@ -63,6 +63,7 @@
 #include "include/soapPTZBindingProxy.h"
 
 #include "include/rapidjson/document.h"
+#include "rapidjson/prettywriter.h"
 
 #include "plugin/wsseapi.h"
 #include "plugin/httpda.h"
@@ -7933,6 +7934,7 @@ void execGenerateRecoverVideoConfig(int fd, rapidjson::Document &d1, uint32_t me
   std::stringstream recoverOut;
   std::string recoverToken;
   std::map <std::string, bool> configTokens;
+  rapidjson::Document prettyD;
 
   _trt__GetProfiles * GetProfiles;
   _trt__GetProfilesResponse * GetProfilesResponse;
@@ -8219,9 +8221,21 @@ void execGenerateRecoverVideoConfig(int fd, rapidjson::Document &d1, uint32_t me
   outStr+="}}";
 //End process response
   recoverScript.close();
+
   destinationScriptPath=destinationScriptPath+".json";
   recoverScript.open (destinationScriptPath.c_str());
-  recoverScript << outStr;
+
+  if (!prettyD.Parse(outStr.c_str()).HasParseError()) {
+    StringBuffer sb;
+    PrettyWriter<StringBuffer> writer(sb);
+    prettyD.Accept(writer);
+    recoverScript << sb.GetString();
+
+  } else {
+    recoverScript << "JSON format error" << endl;
+    recoverScript << outStr;
+  }
+
   recoverScript.close();
 
 cleanSendResponse:
