@@ -7183,7 +7183,7 @@ void execGetSystemDateAndTime(int fd, rapidjson::Document &d1, uint32_t messageI
   else outStr+="\"DaylightSavings\":\"false\", ";
 
   if(GetSystemDateAndTimeResponse->SystemDateAndTime->DateTimeType==tt__SetDateTimeType__Manual)
-    outStr+="\"DateTimeType\":\"Manual\", ";
+    outStr+="\"DateTimeType\":\"Manual\"";
   else outStr+="\"DateTimeType\":\"NTP\"";
   outStr+="}}}";
 //End process response
@@ -7215,6 +7215,11 @@ void execSetSystemDateAndTime(int fd, rapidjson::Document &d1, uint32_t messageI
 
 
   if (d1.HasMember(CMD_PARAMS)) {
+    if(!d1[CMD_PARAMS].HasMember("SystemDateAndTime")) {
+      std::cout << "Failed to process request, No SystemDateAndTime found" << std::endl;
+      outStr="{\"status\":\"ERROR\", \"reason\":\"No SystemDateAndTime found\"}";
+      goto sendResponse;
+    }
   }
   else {
     std::cout << "Failed to process request, No parameters found" << std::endl;
@@ -7261,28 +7266,28 @@ void execSetSystemDateAndTime(int fd, rapidjson::Document &d1, uint32_t messageI
   SetSystemDateAndTime->UTCDateTime=GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime;
 
 //Prepare request
-  if(d1[CMD_PARAMS].HasMember("DateTimeType")) {
-    tmpVar=std::string(d1[CMD_PARAMS]["DateTimeType"].GetString());
+  if(d1[CMD_PARAMS]["SystemDateAndTime"].HasMember("DateTimeType")) {
+    tmpVar=std::string(d1[CMD_PARAMS]["SystemDateAndTime"]["DateTimeType"].GetString());
     if(tmpVar=="Manual") SetSystemDateAndTime->DateTimeType=tt__SetDateTimeType__Manual;
     else SetSystemDateAndTime->DateTimeType=tt__SetDateTimeType__NTP;
   }
-  if(d1[CMD_PARAMS].HasMember("DaylightSavings")) {
-    tmpVar=std::string(d1[CMD_PARAMS]["DaylightSavings"].GetString());
+  if(d1[CMD_PARAMS]["SystemDateAndTime"].HasMember("DaylightSavings")) {
+    tmpVar=std::string(d1[CMD_PARAMS]["SystemDateAndTime"]["DaylightSavings"].GetString());
     if(tmpVar=="true") SetSystemDateAndTime->DaylightSavings=true;
     else SetSystemDateAndTime->DaylightSavings=false;
   }
-  if(d1[CMD_PARAMS].HasMember("TimeZone")) {
-    tmpVar=std::string(d1[CMD_PARAMS]["TimeZone"].GetString());
+  if(d1[CMD_PARAMS]["SystemDateAndTime"].HasMember("TimeZone")) {
+    tmpVar=std::string(d1[CMD_PARAMS]["SystemDateAndTime"]["TimeZone"].GetString());
     if(SetSystemDateAndTime->TimeZone==NULL) SetSystemDateAndTime->TimeZone=soap_new_tt__TimeZone(glSoap,-1);
     SetSystemDateAndTime->TimeZone->TZ=tmpVar;
   }
-  if(d1[CMD_PARAMS].HasMember("UTCDateTime")) {
+  if(d1[CMD_PARAMS]["SystemDateAndTime"].HasMember("UTCDateTime")) {
     if(SetSystemDateAndTime->UTCDateTime==NULL) SetSystemDateAndTime->UTCDateTime=soap_new_tt__DateTime(glSoap,-1);
     if(SetSystemDateAndTime->UTCDateTime->Date==NULL) SetSystemDateAndTime->UTCDateTime->Date=soap_new_tt__Date(glSoap,-1);
     if(SetSystemDateAndTime->UTCDateTime->Time==NULL) SetSystemDateAndTime->UTCDateTime->Time=soap_new_tt__Time(glSoap,-1);
-    if(d1[CMD_PARAMS]["UTCDateTime"].HasMember("Date")) {
-      if(d1[CMD_PARAMS]["UTCDateTime"]["Date"].HasMember("Year")) {
-        tmpVar=std::string(d1[CMD_PARAMS]["UTCDateTime"]["Date"]["Year"].GetString());
+    if(d1[CMD_PARAMS]["SystemDateAndTime"]["UTCDateTime"].HasMember("Date")) {
+      if(d1[CMD_PARAMS]["SystemDateAndTime"]["UTCDateTime"]["Date"].HasMember("Year")) {
+        tmpVar=std::string(d1[CMD_PARAMS]["SystemDateAndTime"]["UTCDateTime"]["Date"]["Year"].GetString());
         SetSystemDateAndTime->UTCDateTime->Date->Year=std::stoi(tmpVar);
       }
       else{
@@ -7290,8 +7295,8 @@ void execSetSystemDateAndTime(int fd, rapidjson::Document &d1, uint32_t messageI
         outStr="{\"status\":\"ERROR\", \"reason\":\"No UTCDateTime:Date:Year found\"}";
         goto sendResponse;
       }
-      if(d1[CMD_PARAMS]["UTCDateTime"]["Date"].HasMember("Month")) {
-        tmpVar=std::string(d1[CMD_PARAMS]["UTCDateTime"]["Date"]["Month"].GetString());
+      if(d1[CMD_PARAMS]["SystemDateAndTime"]["UTCDateTime"]["Date"].HasMember("Month")) {
+        tmpVar=std::string(d1[CMD_PARAMS]["SystemDateAndTime"]["UTCDateTime"]["Date"]["Month"].GetString());
         SetSystemDateAndTime->UTCDateTime->Date->Month=std::stoi(tmpVar);
       }
       else{
@@ -7299,8 +7304,8 @@ void execSetSystemDateAndTime(int fd, rapidjson::Document &d1, uint32_t messageI
         outStr="{\"status\":\"ERROR\", \"reason\":\"No UTCDateTime:Date:Month found\"}";
         goto sendResponse;
       }
-      if(d1[CMD_PARAMS]["UTCDateTime"]["Date"].HasMember("Day")) {
-        tmpVar=std::string(d1[CMD_PARAMS]["UTCDateTime"]["Date"]["Day"].GetString());
+      if(d1[CMD_PARAMS]["SystemDateAndTime"]["UTCDateTime"]["Date"].HasMember("Day")) {
+        tmpVar=std::string(d1[CMD_PARAMS]["SystemDateAndTime"]["UTCDateTime"]["Date"]["Day"].GetString());
         SetSystemDateAndTime->UTCDateTime->Date->Day=std::stoi(tmpVar);
       }
       else{
@@ -7314,9 +7319,9 @@ void execSetSystemDateAndTime(int fd, rapidjson::Document &d1, uint32_t messageI
       outStr="{\"status\":\"ERROR\", \"reason\":\"No UTCDateTime:Date found\"}";
       goto sendResponse;
     }
-    if(d1[CMD_PARAMS]["UTCDateTime"].HasMember("Time")) {
-      if(d1[CMD_PARAMS]["UTCDateTime"]["Time"].HasMember("Hour")) {
-        tmpVar=std::string(d1[CMD_PARAMS]["UTCDateTime"]["Time"]["Hour"].GetString());
+    if(d1[CMD_PARAMS]["SystemDateAndTime"]["UTCDateTime"].HasMember("Time")) {
+      if(d1[CMD_PARAMS]["SystemDateAndTime"]["UTCDateTime"]["Time"].HasMember("Hour")) {
+        tmpVar=std::string(d1[CMD_PARAMS]["SystemDateAndTime"]["UTCDateTime"]["Time"]["Hour"].GetString());
         SetSystemDateAndTime->UTCDateTime->Time->Hour=std::stoi(tmpVar);
       }
       else{
@@ -7324,8 +7329,8 @@ void execSetSystemDateAndTime(int fd, rapidjson::Document &d1, uint32_t messageI
         outStr="{\"status\":\"ERROR\", \"reason\":\"No UTCDateTime:Time:Hour found\"}";
         goto sendResponse;
       }
-      if(d1[CMD_PARAMS]["UTCDateTime"]["Time"].HasMember("Minute")) {
-        tmpVar=std::string(d1[CMD_PARAMS]["UTCDateTime"]["Time"]["Minute"].GetString());
+      if(d1[CMD_PARAMS]["SystemDateAndTime"]["UTCDateTime"]["Time"].HasMember("Minute")) {
+        tmpVar=std::string(d1[CMD_PARAMS]["SystemDateAndTime"]["UTCDateTime"]["Time"]["Minute"].GetString());
         SetSystemDateAndTime->UTCDateTime->Time->Minute=std::stoi(tmpVar);
       }
       else{
@@ -7333,8 +7338,8 @@ void execSetSystemDateAndTime(int fd, rapidjson::Document &d1, uint32_t messageI
         outStr="{\"status\":\"ERROR\", \"reason\":\"No UTCDateTime:Time:Minute found\"}";
         goto sendResponse;
       }
-      if(d1[CMD_PARAMS]["UTCDateTime"]["Time"].HasMember("Second")) {
-        tmpVar=std::string(d1[CMD_PARAMS]["UTCDateTime"]["Time"]["Second"].GetString());
+      if(d1[CMD_PARAMS]["SystemDateAndTime"]["UTCDateTime"]["Time"].HasMember("Second")) {
+        tmpVar=std::string(d1[CMD_PARAMS]["SystemDateAndTime"]["UTCDateTime"]["Time"]["Second"].GetString());
         SetSystemDateAndTime->UTCDateTime->Time->Second=std::stoi(tmpVar);
       }
       else{
