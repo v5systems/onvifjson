@@ -63,6 +63,7 @@
 #include "include/soapPTZBindingProxy.h"
 
 #include "include/rapidjson/document.h"
+#include "rapidjson/prettywriter.h"
 
 #include "plugin/wsseapi.h"
 #include "plugin/httpda.h"
@@ -108,6 +109,7 @@ struct tClient {
 
 std::map<int, tClient*> clientConnections;
 std::vector<std::string> videoSources;
+std::vector<std::string> videoSourceConfigs;
 
 char const* progName;
 std::string onvifPass;
@@ -6690,6 +6692,7 @@ void execGetProfiles(int fd, rapidjson::Document &d1, uint32_t messageID) {
   outStr="{\"status\":\"OK\", \"parameters\":{";
   if(verbosity>3) std::cout << "Number of Profiles received is "
                               << GetProfilesResponse->Profiles.size() << std::endl;
+  videoSourceConfigs.clear();
   if(GetProfilesResponse->Profiles.size()>0) {
     outStr+="\"Profiles\":[";
     for (unsigned i=0; i<GetProfilesResponse->Profiles.size(); i++) {
@@ -6837,6 +6840,7 @@ void execGetProfiles(int fd, rapidjson::Document &d1, uint32_t messageID) {
         outStr+="\"VideoSourceConfiguration\":{";
         outStr+="\"token\":\""+tmpConfig->VideoSourceConfiguration->token+"\"";
         outStr+="}, ";
+        videoSourceConfigs.push_back(tmpConfig->VideoSourceConfiguration->token);
       }
       outStr+="\"Name\":\""+tmpConfig->Name+"\", ";
       outStr+="\"token\":\""+tmpConfig->token+"\"";
@@ -6854,6 +6858,7 @@ cleanSendResponse:
   soap_end(glSoap);
 
 sendResponse:
+  if(!fd)return;
   unsigned char data[outStr.length()+sHeader];
   pHeader tmpHeader= (pHeader)data;
   tmpHeader->dataLen=outStr.length();
@@ -7938,6 +7943,7 @@ void execGenerateRecoverVideoConfig(int fd, rapidjson::Document &d1, uint32_t me
   std::stringstream recoverOut;
   std::string recoverToken;
   std::map <std::string, bool> configTokens;
+  rapidjson::Document prettyD;
 
   _trt__GetProfiles * GetProfiles;
   _trt__GetProfilesResponse * GetProfilesResponse;
@@ -8226,7 +8232,19 @@ void execGenerateRecoverVideoConfig(int fd, rapidjson::Document &d1, uint32_t me
   recoverScript.close();
   destinationScriptPath=destinationScriptPath+".json";
   recoverScript.open (destinationScriptPath.c_str());
-  recoverScript << outStr;
+
+  //recoverScript << outStr;
+  if (!prettyD.Parse(outStr.c_str()).HasParseError()) {
+    StringBuffer sb;
+    PrettyWriter<StringBuffer> writer(sb);
+    prettyD.Accept(writer);    // Accept() traverses the DOM and generates Handler events.
+    recoverScript << sb.GetString();
+  }
+  else {
+    recoverScript << "JSON format error" << endl;
+    recoverScript << outStr;
+  }
+
   recoverScript.close();
 
 cleanSendResponse:
@@ -9131,6 +9149,10 @@ int main(int argc, char **argv) {
     if(verbosity>2)std::cout <<  "No valid video sources found" << std::endl;
     return -9;
   }
+//Get video configs:
+  videoSourceConfigs.push_back(videoSources[0]);
+  rapidjson::Document dd;
+  execGetProfiles(0, dd, 0);
 
 //OSD Options
 //        virtual int GetOSDOptions(_trt__GetOSDOptions *trt__GetOSDOptions, _trt__GetOSDOptionsResponse //&trt__GetOSDOptionsResponse)
@@ -9151,7 +9173,7 @@ int main(int argc, char **argv) {
 
   _trt__GetOSDOptions *tmpGetOSDOptions = soap_new__trt__GetOSDOptions(glSoap, -1);
   _trt__GetOSDOptionsResponse* tmpGetOSDOptionsResponse = soap_new__trt__GetOSDOptionsResponse(glSoap, -1);
-  tmpGetOSDOptions->ConfigurationToken=videoSources[0];
+  tmpGetOSDOptions->ConfigurationToken=videoSourceConfigs[0];
 
   faultStr="";
   if(false == sendGetOSDOptions(&proxyMedia, tmpGetOSDOptions, tmpGetOSDOptionsResponse)) {
