@@ -7284,7 +7284,7 @@ void execSetSystemDateAndTime(int fd, rapidjson::Document &d1, uint32_t messageI
   if(d1[CMD_PARAMS]["SystemDateAndTime"].HasMember("TimeZone")) {
     tmpVar=std::string(d1[CMD_PARAMS]["SystemDateAndTime"]["TimeZone"].GetString());
     if(SetSystemDateAndTime->TimeZone==NULL) SetSystemDateAndTime->TimeZone=soap_new_tt__TimeZone(glSoap,-1);
-    SetSystemDateAndTime->TimeZone->TZ=tmpVar;
+    SetSystemDateAndTime->TimeZone.TZ=tmpVar;
   }
   if(d1[CMD_PARAMS]["SystemDateAndTime"].HasMember("UTCDateTime")) {
     if(SetSystemDateAndTime->UTCDateTime==NULL) SetSystemDateAndTime->UTCDateTime=soap_new_tt__DateTime(glSoap,-1);
